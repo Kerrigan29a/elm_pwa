@@ -32,28 +32,7 @@ main =
 -- MODEL
 
 
-banner =
-    """
-▓█████▄  ██▓ ▄████▄  ▓█████                       
-▒██▀ ██▌▓██▒▒██▀ ▀█  ▓█   ▀                       
-░██   █▌▒██▒▒▓█    ▄ ▒███                         
-░▓█▄   ▌░██░▒▓▓▄ ▄██▒▒▓█  ▄                       
-░▒████▓ ░██░▒ ▓███▀ ░░▒████▒                      
- ▒▒▓  ▒ ░▓  ░ ░▒ ▒  ░░░ ▒░ ░                      
- ░ ▒  ▒  ▒ ░  ░  ▒    ░ ░  ░                      
- ░ ░  ░  ▒ ░░           ░                         
-   ░     ░  ░ ░         ░  ░                      
- ░          ░                                     
- ██▀███   ▒█████   ██▓     ██▓    ▓█████  ██▀███  
-▓██ ▒ ██▒▒██▒  ██▒▓██▒    ▓██▒    ▓█   ▀ ▓██ ▒ ██▒
-▓██ ░▄█ ▒▒██░  ██▒▒██░    ▒██░    ▒███   ▓██ ░▄█ ▒
-▒██▀▀█▄  ▒██   ██░▒██░    ▒██░    ▒▓█  ▄ ▒██▀▀█▄  
-░██▓ ▒██▒░ ████▓▒░░██████▒░██████▒░▒████▒░██▓ ▒██▒
-░ ▒▓ ░▒▓░░ ▒░▒░▒░ ░ ▒░▓  ░░ ▒░▓  ░░░ ▒░ ░░ ▒▓ ░▒▓░
-  ░▒ ░ ▒░  ░ ▒ ▒░ ░ ░ ▒  ░░ ░ ▒  ░ ░ ░  ░  ░▒ ░ ▒░
-  ░░   ░ ░ ░ ░ ▒    ░ ░     ░ ░      ░     ░░   ░ 
-   ░         ░ ░      ░  ░    ░  ░   ░  ░   ░     
-"""
+banner = "Welcome to the Dice Roller!\n\n"
 
 
 type alias Model =
@@ -158,25 +137,47 @@ view : Model -> Html Msg
 view model =
     div []
         [ header []
-            [ div []
-                [ label [] [ text "Sides: ", input [ placeholder (String.fromInt model.sides), onInput UpdateSides ] [] ]
-                , label [] [ text "Amount: ", input [ placeholder (String.fromInt model.amount), onInput UpdateAmount ] [] ]
-                , button [ onClick Roll ] [ text "Roll" ]
-                ]
-            , div []
-                [ label []
-                    [ text "Table: "
-                    , select [ onInput UpdateTable ]
-                        (List.map (\x -> option [ value x, selected (x == model.table) ] [ text x ]) (Dict.keys tables))
+            [ section [class "nes-container with-title"]
+                [ h1 [class "title"] [text "Dice Roller"]
+                , div [class "nes-field"]
+                    [ label [for "sides", class "nes-text is-primary"] [ text "Sides" ]
+                    , input [id "sides", class "nes-input", type_ "text" , placeholder (String.fromInt model.sides), onInput UpdateSides] []
                     ]
-                , button [ onClick Ask ] [ text "Ask" ]
-                ]
-            , div []
-                [ button [ onClick Clear ] [ text "Clear" ]
+                , div [class "nes-field"]
+                    [ label [for "amount", class "nes-text is-primary"] [ text "Amount" ]
+                    , input [id "amount", class "nes-input", type_ "text", placeholder (String.fromInt model.amount), onInput UpdateAmount] []
+                    ]
+                , div [class "nes-field"]
+                    [ label [for "tables", class "nes-text is-success"] [ text "Table" ]
+                    , div [class "nes-select"]
+                        [ select [id "tables", onInput UpdateTable]
+                            (List.map (\x -> option [ value x, selected (x == model.table) ] [ text x ]) (Dict.keys tables))
+                        ]
+                    ]
+                , button [class "nes-btn is-primary", onClick Roll] [ text "Roll" ]
+                , button [class "nes-btn is-success", onClick Ask] [ text "Ask" ]
+                , button [class "nes-btn is-warning", onClick Clear] [ text "Clear" ]
                 ]
             ]
-        , main_ []
-            [ pre [] [ text model.journal ]
+            -- [ section [class "nes-container with-title"]
+            --     [ h1 [class "title"] [text "Dice Roller"]
+            --     , label [for "sides", class "nes-text is-primary"] [ text "Sides" ]
+            --     , input [id "sides", class "nes-input", type_ "text" , placeholder (String.fromInt model.sides), onInput UpdateSides] []
+            --     , label [for "amount", class "nes-text is-primary"] [ text "Amount" ]
+            --     , input [id "amount", class "nes-input", type_ "text", placeholder (String.fromInt model.amount), onInput UpdateAmount] []
+            --     , label [for "tables", class "nes-text is-success"] [ text "Table" ]
+            --     , div [class "nes-select"]
+            --         [ select [id "tables", onInput UpdateTable]
+            --             (List.map (\x -> option [ value x, selected (x == model.table) ] [ text x ]) (Dict.keys tables))
+            --         ]
+            --     , button [class "nes-btn is-primary", onClick Roll] [ text "Roll" ]
+            --     , button [class "nes-btn is-success", onClick Ask] [ text "Ask" ]
+            --     , button [class "nes-btn is-warning", onClick Clear] [ text "Clear" ]
+            --     ]
+            -- ]
+        , main_ [class "nes-container is-dark with-title"]
+            [ h1 [class "title"] [ text "Journal" ]
+            , pre [] [ text model.journal ]
             ]
         ]
 

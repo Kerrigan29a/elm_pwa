@@ -1,25 +1,24 @@
+<!DOCTYPE html>
 <html>
 
 <head>
-  <head>
-      <meta charset="utf-8" />
-      <meta http-equiv="X-UA-Compatible" content="IE=edge">
-      <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-      <meta name="mobile-web-app-capable" content="yes" />
-      <meta name="apple-mobile-web-app-capable" content="yes" />
-      <title>Dice Roller</title>
-      <link rel="icon" href="favicon.ico" sizes="any">
-      <link rel="apple-touch-icon" href="apple-touch-icon.png">
-      <link rel="manifest" href="manifest.json">
-      <link rel="stylesheet" href="style.css" >
-  </head>
-  <script src="main.js"></script>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>Dice Roller</title>
+    <link rel="icon" href="favicon.ico" sizes="any">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.json">
+    <link href="https://fonts.googleapis.com/css?family=Press+Start+2P" rel="stylesheet">
+    <link href="https://unpkg.com/nes.css/css/nes.css" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css">
+    <script src="main.js"></script>
 </head>
 
 <body>
-    <body>
-        <div id="app"></div>
-    </body>
+    <div id="app"></div>
 </body>
 
 <script type="text/javascript">
@@ -38,16 +37,16 @@
 
     var storedData = localStorage.getItem(STORAGE_NAME);
     var flags = storedData ? JSON.parse(storedData) : null;
-    
+
     var app = Elm.Main.init({
         node: document.getElementById('app'),
         flags: flags
     });
-    
-    app.ports.setStorage.subscribe(function(state) {
+
+    app.ports.setStorage.subscribe(function (state) {
         localStorage.setItem(STORAGE_NAME, JSON.stringify(state));
     });
-    app.ports.clearStorage.subscribe(function() {
+    app.ports.clearStorage.subscribe(function () {
         localStorage.removeItem(STORAGE_NAME);
     });
 </script>
