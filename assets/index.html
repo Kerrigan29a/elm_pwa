@@ -1,0 +1,55 @@
+<html>
+
+<head>
+  <head>
+      <meta charset="utf-8" />
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
+      <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+      <meta name="mobile-web-app-capable" content="yes" />
+      <meta name="apple-mobile-web-app-capable" content="yes" />
+      <title>Dice Roller</title>
+      <link rel="icon" href="favicon.ico" sizes="any">
+      <link rel="apple-touch-icon" href="apple-touch-icon.png">
+      <link rel="manifest" href="manifest.json">
+      <link rel="stylesheet" href="style.css" >
+  </head>
+  <script src="main.js"></script>
+</head>
+
+<body>
+    <body>
+        <div id="app"></div>
+    </body>
+</body>
+
+<script type="text/javascript">
+    // Register service worker to control making site work offline
+    window.addEventListener('load', () => {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker
+                .register('service-worker.js')
+                .then(() => { console.log('[Service Worker] Registered'); })
+                .catch((err) => { console.warn('[Service Worker] Error: ' + err); })
+        }
+    });
+
+    // Load Elm app
+    var STORAGE_NAME = 'dice-roller-v1';
+
+    var storedData = localStorage.getItem(STORAGE_NAME);
+    var flags = storedData ? JSON.parse(storedData) : null;
+    
+    var app = Elm.Main.init({
+        node: document.getElementById('app'),
+        flags: flags
+    });
+    
+    app.ports.setStorage.subscribe(function(state) {
+        localStorage.setItem(STORAGE_NAME, JSON.stringify(state));
+    });
+    app.ports.clearStorage.subscribe(function() {
+        localStorage.removeItem(STORAGE_NAME);
+    });
+</script>
+
+</html>

@@ -1,0 +1,9 @@
+# Elm
+elm-stuff
+repl-temp-*
+
+# Mac files
+.DS_Store
+
+# gh-pages
+dist
