@@ -14,7 +14,8 @@ import Platform.Cmd as Cmd
 import Random
 import Tables exposing (..)
 
-
+version : String
+version = "0.1.0"
 
 -- MAIN
 
@@ -32,7 +33,8 @@ main =
 -- MODEL
 
 
-banner = "Welcome to the Dice Roller!\n\n"
+banner : String
+banner = "Welcome to the Dice Roller (v" ++ version ++ ")!\n\n"
 
 
 type alias Model =
@@ -138,7 +140,7 @@ view model =
     div []
         [ header []
             [ section [class "nes-container with-title"]
-                [ h1 [class "title"] [text "Dice Roller"]
+                [ h1 [class "title"] [text ("Dice Roller (v" ++ version ++ ")")]
                 , div [class "nes-field"]
                     [ label [for "sides", class "nes-text is-primary"] [ text "Sides" ]
                     , input [id "sides", class "nes-input", type_ "text" , placeholder (String.fromInt model.sides), onInput UpdateSides] []
@@ -159,22 +161,6 @@ view model =
                 , button [class "nes-btn is-warning", onClick Clear] [ text "Clear" ]
                 ]
             ]
-            -- [ section [class "nes-container with-title"]
-            --     [ h1 [class "title"] [text "Dice Roller"]
-            --     , label [for "sides", class "nes-text is-primary"] [ text "Sides" ]
-            --     , input [id "sides", class "nes-input", type_ "text" , placeholder (String.fromInt model.sides), onInput UpdateSides] []
-            --     , label [for "amount", class "nes-text is-primary"] [ text "Amount" ]
-            --     , input [id "amount", class "nes-input", type_ "text", placeholder (String.fromInt model.amount), onInput UpdateAmount] []
-            --     , label [for "tables", class "nes-text is-success"] [ text "Table" ]
-            --     , div [class "nes-select"]
-            --         [ select [id "tables", onInput UpdateTable]
-            --             (List.map (\x -> option [ value x, selected (x == model.table) ] [ text x ]) (Dict.keys tables))
-            --         ]
-            --     , button [class "nes-btn is-primary", onClick Roll] [ text "Roll" ]
-            --     , button [class "nes-btn is-success", onClick Ask] [ text "Ask" ]
-            --     , button [class "nes-btn is-warning", onClick Clear] [ text "Clear" ]
-            --     ]
-            -- ]
         , main_ [class "nes-container is-dark with-title"]
             [ h1 [class "title"] [ text "Journal" ]
             , pre [] [ text model.journal ]
