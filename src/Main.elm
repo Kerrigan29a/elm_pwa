@@ -15,7 +15,7 @@ import Random
 import Tables exposing (..)
 
 version : String
-version = "0.1.0"
+version = "0.1.1"
 
 -- MAIN
 

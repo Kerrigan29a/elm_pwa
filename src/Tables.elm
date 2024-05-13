@@ -6,13 +6,12 @@ import Dict exposing (..)
 
 tables = Dict.fromList
     [ ( "CitR: Actions", citr_actions )
-    , ( "CitR: Focus", citr_actions )
+    , ( "CitR: Focus", citr_focus )
     ]
 
 citr_actions = Array.fromList
     [ "Abandon"
     , "Acquire"
-    , "Action"
     , "Arrive"
     , "Attack"
     , "Capture"
