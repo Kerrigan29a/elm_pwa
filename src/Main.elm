@@ -17,7 +17,7 @@ import Tables exposing (..)
 
 version : String
 version =
-    "0.2.0"
+    "0.3.0"
 
 
 
@@ -75,7 +75,7 @@ type Msg
     | NewDice (List Int)
     | UpdateTable String
     | Ask
-    | NewAnswer Int
+    | NewAnswer String
     | Clear
 
 
@@ -126,7 +126,7 @@ update msg model =
             ( { model | table = table }, Cmd.none )
 
         Ask ->
-            ( model, Random.generate NewAnswer (Random.int 0 ((Dict.get model.table tables |> Maybe.withDefault Array.empty |> Array.length) - 1)) )
+            ( model, Random.generate NewAnswer (Dict.get model.table tables |> Maybe.withDefault (Random.constant "Table not found")) )
 
         NewAnswer answer ->
             ( { model
@@ -135,7 +135,7 @@ update msg model =
                         ++ model.table
                         ++ "\n"
                         ++ "Response: "
-                        ++ (Dict.get model.table tables |> Maybe.withDefault Array.empty |> Array.get answer |> Maybe.withDefault "")
+                        ++ answer
                         ++ "\n\n"
                         ++ model.journal
               }
