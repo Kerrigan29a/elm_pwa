@@ -14,8 +14,12 @@ import Platform.Cmd as Cmd
 import Random
 import Tables exposing (..)
 
+
 version : String
-version = "0.1.1"
+version =
+    "0.2.0"
+
+
 
 -- MAIN
 
@@ -34,12 +38,14 @@ main =
 
 
 banner : String
-banner = "Welcome to the Dice Roller (v" ++ version ++ ")!\n\n"
+banner =
+    "Welcome to the Dice Roller (v" ++ version ++ ")!\n\n"
 
 
 type alias Model =
     { sides : Int
     , amount : Int
+    , explode : Bool
     , table : String
     , journal : String
     }
@@ -52,7 +58,7 @@ init flags =
             model
 
         Err _ ->
-            { sides = 6, amount = 1, table = Dict.keys tables |> List.head |> Maybe.withDefault "", journal = banner }
+            { sides = 6, amount = 1, explode = False, table = Dict.keys tables |> List.head |> Maybe.withDefault "", journal = banner }
     , Cmd.none
     )
 
@@ -64,6 +70,7 @@ init flags =
 type Msg
     = UpdateSides String
     | UpdateAmount String
+    | UpdateExplode
     | Roll
     | NewDice (List Int)
     | UpdateTable String
@@ -81,8 +88,15 @@ update msg model =
         UpdateAmount amount ->
             ( { model | amount = String.toInt amount |> Maybe.withDefault model.amount }, Cmd.none )
 
+        UpdateExplode ->
+            ( { model | explode = not model.explode }, Cmd.none )
+
         Roll ->
-            ( model, Random.generate NewDice (Random.list model.amount (Random.int 1 model.sides)) )
+            if model.explode then
+                ( model, Random.generate NewDice (rollExplodingDice model.amount model.sides) )
+
+            else
+                ( model, Random.generate NewDice (Random.list model.amount (Random.int 1 model.sides)) )
 
         NewDice dice ->
             ( { model
@@ -90,6 +104,7 @@ update msg model =
                     String.fromInt model.amount
                         ++ "d"
                         ++ String.fromInt model.sides
+                        ++ (if model.explode then "!" else "")
                         ++ ": "
                         ++ String.join ", " (List.map String.fromInt dice)
                         ++ "\n"
@@ -132,6 +147,28 @@ update msg model =
 
 
 
+-- RANDOM GENERATION
+
+
+rollExplodingDice : Int -> Int -> Random.Generator (List Int)
+rollExplodingDice amount sides =
+    Random.map List.concat (Random.list amount (explosiveDieRoll sides))
+
+
+explosiveDieRoll : Int -> Random.Generator (List Int)
+explosiveDieRoll sides =
+    Random.int 1 sides
+        |> Random.andThen
+            (\roll ->
+                if roll == sides then
+                    Random.map ((::) roll) (explosiveDieRoll sides)
+
+                else
+                    Random.constant [ roll ]
+            )
+
+
+
 -- VIEW
 
 
@@ -140,35 +177,39 @@ view model =
     div []
         [ header []
             [ section []
-                [ h1 [class "title"] [text ("Dice Roller (v" ++ version ++ ")")]
+                [ h1 [ class "title" ] [ text ("Dice Roller (v" ++ version ++ ")") ]
                 , Html.form []
-                    [ fieldset [class "my-inline-container"]
-                        [ legend [] [text "Dices"]
-                        , div [class "my-input"]
-                            [ label [for "sides"] [ text "Sides" ]    
-                            , input [id "sides", type_ "text" , placeholder (String.fromInt model.sides), onInput UpdateSides] []
+                    [ fieldset [ class "my-inline-container" ]
+                        [ legend [] [ text "Dices" ]
+                        , div [ class "my-input" ]
+                            [ label [ for "sides" ] [ text "Sides" ]
+                            , input [ id "sides", type_ "text", placeholder (String.fromInt model.sides), onInput UpdateSides ] []
                             ]
-                        , div [class "my-input"]
-                            [ label [for "amount"] [ text "Amount" ]
-                            , input [id "amount", type_ "text", placeholder (String.fromInt model.amount), onInput UpdateAmount] []
+                        , div [ class "my-input" ]
+                            [ label [ for "amount" ] [ text "Amount" ]
+                            , input [ id "amount", type_ "text", placeholder (String.fromInt model.amount), onInput UpdateAmount ] []
                             ]
-                        , button [class "my-btn", onClick Roll] [ text "Roll" ]
+                        , div [ class "my-input" ]
+                            [ input [ id "explode", type_ "checkbox", checked model.explode, onClick UpdateExplode ] []
+                            , label [ for "explode" ] [ text "Explode" ]
+                            ]
+                        , button [ class "my-btn", onClick Roll ] [ text "Roll" ]
                         ]
-                    , fieldset [class "my-inline-container"]
-                        [ legend [] [text "Tables"]
-                        , div [class "my-select"]
-                            [ label [for "tables"] [ text "Table" ]
-                            , select [id "tables", onInput UpdateTable]
+                    , fieldset [ class "my-inline-container" ]
+                        [ legend [] [ text "Tables" ]
+                        , div [ class "my-select" ]
+                            [ label [ for "tables" ] [ text "Table" ]
+                            , select [ id "tables", onInput UpdateTable ]
                                 (List.map (\x -> option [ value x, selected (x == model.table) ] [ text x ]) (Dict.keys tables))
                             ]
-                        , button [class "my-btn", onClick Ask] [ text "Ask" ]
+                        , button [ class "my-btn", onClick Ask ] [ text "Ask" ]
                         ]
-                    , button [class "my-btn", onClick Clear] [ text "Clear" ]
+                    , button [ class "my-btn", onClick Clear ] [ text "Clear" ]
                     ]
                 ]
             ]
         , main_ []
-            [ h1 [class "title"] [ text "Journal" ]
+            [ h1 [ class "title" ] [ text "Journal" ]
             , pre [] [ text model.journal ]
             ]
         ]
@@ -200,6 +241,7 @@ encode model =
     E.object
         [ ( "sides", E.int model.sides )
         , ( "amount", E.int model.amount )
+        , ( "explode", E.bool model.explode )
         , ( "table", E.string model.table )
         , ( "journal", E.string model.journal )
         ]
@@ -207,8 +249,9 @@ encode model =
 
 decoder : D.Decoder Model
 decoder =
-    D.map4 Model
+    D.map5 Model
         (D.field "sides" D.int)
         (D.field "amount" D.int)
+        (D.field "explode" D.bool)
         (D.field "table" D.string)
         (D.field "journal" D.string)

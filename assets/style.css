@@ -13,14 +13,14 @@ form {
 
 .my-inline-container .my-input {
     flex-basis: 0;
-    flex-grow: 2;
+    flex-grow: 1;
     flex-direction: column;
     padding-right: 8px;
 }
 
 .my-inline-container .my-select {
     flex-basis: 0;
-    flex-grow: 4;
+    flex-grow: 3;
     flex-direction: column;
     padding-right: 8px;
 }
