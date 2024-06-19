@@ -1,3 +1,36 @@
-html, body, pre, code, kbd, samp {
-    font-family: "Press Start 2P";
+form {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: column;
+}
+
+.my-inline-container {
+    display:flex;
+    flex-wrap: wrap;
+    align-items: center;
+    flex-direction: row;
+}
+
+.my-inline-container .my-input {
+    flex-basis: 0;
+    flex-grow: 2;
+    flex-direction: column;
+    padding-right: 8px;
+}
+
+.my-inline-container .my-select {
+    flex-basis: 0;
+    flex-grow: 4;
+    flex-direction: column;
+    padding-right: 8px;
+}
+
+.my-inline-container .my-select select {
+    width: 100%;
+}
+
+.my-inline-container .my-btn {
+    flex-basis: 0;
+    flex-grow: 1;
+    margin-top: 0;
 }
