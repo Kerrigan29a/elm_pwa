@@ -208,17 +208,17 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         GotIcons (Ok iconsList) ->
-            let
-                _ =
-                    Debug.log "Icons loaded successfully:" iconsList
-            in
+            -- let
+            --     _ =
+            --         Debug.log "Icons loaded successfully:" iconsList
+            -- in
             ( { model | icons = iconsList }, Cmd.none )
 
         GotIcons (Err err) ->
-            let
-                _ =
-                    Debug.log "Error loading icons:" err
-            in
+            -- let
+            --     _ =
+            --         Debug.log "Error loading icons:" err
+            -- in
             ( model, Cmd.none )
 
         UpdateDiceSides sides ->
