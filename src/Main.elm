@@ -21,7 +21,7 @@ import Tables exposing (..)
 
 version : String
 version =
-    "0.4.2"
+    "0.4.3"
 
 
 
@@ -331,16 +331,16 @@ view model =
                 [ fieldset [ class "my-inline-container" ]
                     [ legend [] [ text "Dices" ]
                     , div [ class "my-input" ]
-                        [ label [ for "sides" ] [ text "Sides" ]
-                        , input [ id "sides", type_ "text", placeholder (String.fromInt model.dice_sides), onInput UpdateDiceSides ] []
+                        [ label [ for "dice_sides" ] [ text "Sides" ]
+                        , input [ id "dice_sides", type_ "text", placeholder (String.fromInt model.dice_sides), onInput UpdateDiceSides ] []
                         ]
                     , div [ class "my-input" ]
-                        [ label [ for "amount" ] [ text "Amount" ]
-                        , input [ id "amount", type_ "text", placeholder (String.fromInt model.dice_amount), onInput UpdateDiceAmount ] []
+                        [ label [ for "dice_amount" ] [ text "Amount" ]
+                        , input [ id "dice_amount", type_ "text", placeholder (String.fromInt model.dice_amount), onInput UpdateDiceAmount ] []
                         ]
                     , div [ class "my-input" ]
-                        [ input [ id "explode", type_ "checkbox", checked model.dice_explode, onClick UpdateDiceExplode ] []
-                        , label [ for "explode" ] [ text "Explode" ]
+                        [ input [ id "dice_explode", type_ "checkbox", checked model.dice_explode, onClick UpdateDiceExplode ] []
+                        , label [ for "dice_explode" ] [ text "Explode" ]
                         ]
                     , button [ class "my-btn", onClick Roll ] [ text "Roll" ]
                     ]
@@ -356,8 +356,8 @@ view model =
                 , fieldset [ class "my-inline-container" ]
                     [ legend [] [ text "Icons" ]
                     , div [ class "my-input" ]
-                        [ label [ for "amount" ] [ text "Amount" ]
-                        , input [ id "amount", type_ "text", placeholder (String.fromInt model.icon_amount), onInput UpdateIconAmount ] []
+                        [ label [ for "icon_amount" ] [ text "Amount" ]
+                        , input [ id "icon_amount", type_ "text", placeholder (String.fromInt model.icon_amount), onInput UpdateIconAmount ] []
                         ]
                     , button [ class "my-btn", onClick Show ] [ text "Show" ]
                     ]
