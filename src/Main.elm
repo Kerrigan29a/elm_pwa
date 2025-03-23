@@ -8,16 +8,20 @@ import Dict
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Http
 import Json.Decode as D
 import Json.Encode as E
+import List.Extra
 import Platform.Cmd as Cmd
 import Random
+import Svg exposing (image, svg)
+import Svg.Attributes as SvgAttr
 import Tables exposing (..)
 
 
 version : String
 version =
-    "0.3.3"
+    "0.4.0"
 
 
 
@@ -34,16 +38,87 @@ main =
 
 
 
+-- STORAGE
+
+
+port setStorage : E.Value -> Cmd msg
+
+
+port clearStorage : () -> Cmd msg
+
+
+updateWithStorage : Msg -> Model -> ( Model, Cmd Msg )
+updateWithStorage msg oldModel =
+    let
+        ( newModel, cmds ) =
+            update msg oldModel
+    in
+    ( newModel
+    , Cmd.batch [ setStorage (encode newModel), cmds ]
+    )
+
+
+encode : Model -> E.Value
+encode model =
+    E.object
+        [ ( "dice_sides", E.int model.dice_sides )
+        , ( "dice_amount", E.int model.dice_amount )
+        , ( "dice_explode", E.bool model.dice_explode )
+        , ( "table", E.string model.table )
+        , ( "icon_amount", E.int model.icon_amount )
+        , ( "journal", E.list entryEncoder model.journal )
+        ]
+
+
+decoder : D.Decoder Model
+decoder =
+    D.map7 Model
+        (D.field "dice_sides" D.int)
+        (D.field "dice_amount" D.int)
+        (D.field "dice_explode" D.bool)
+        (D.field "table" D.string)
+        (D.field "icon_amount" D.int)
+        (D.succeed [])
+        -- Le asigna una lista vacía a icons
+        (D.field "journal" (D.list entryDecoder))
+
+
+entryEncoder : Entry -> E.Value
+entryEncoder entry =
+    case entry of
+        Txt list ->
+            E.object [ ( "Txt", E.list E.string list ) ]
+
+        Img string ->
+            E.object [ ( "Img", E.string string ) ]
+
+
+entryDecoder : D.Decoder Entry
+entryDecoder =
+    D.oneOf
+        [ D.field "Txt" (D.map Txt (D.list D.string))
+        , D.field "Img" (D.map Img D.string)
+        ]
+
+
+
 -- MODEL
 
 
 type alias Model =
-    { sides : Int
-    , amount : Int
-    , explode : Bool
+    { dice_sides : Int
+    , dice_amount : Int
+    , dice_explode : Bool
     , table : String
-    , journal : List (List String)
+    , icon_amount : Int
+    , icons : List String
+    , journal : List Entry
     }
+
+
+type Entry
+    = Txt (List String)
+    | Img String
 
 
 init : E.Value -> ( Model, Cmd Msg )
@@ -53,14 +128,60 @@ init flags =
             model
 
         Err _ ->
-            { sides = 6
-            , amount = 1
-            , explode = False
+            { dice_sides = 6
+            , dice_amount = 1
+            , dice_explode = False
             , table = Dict.keys tables |> List.head |> Maybe.withDefault ""
+            , icon_amount = 3
+            , icons = []
             , journal = []
             }
-    , Cmd.none
+    , Http.get
+        { url = "/icons/icons.json"
+        , expect = Http.expectJson GotIcons iconsDecoder
+        }
     )
+
+
+iconsDecoder : D.Decoder (List String)
+
+
+
+-- From:
+-- {
+--   "icons": {
+--     "1x1": {
+--       "andymeneely": [ "police-badge", "riposte" ],
+--       "aussiesim": [ "card-10-clubs", … ],
+--       …
+--     }
+--   }
+-- }
+-- To:
+-- [
+-- "icons/ffffff/transparent/1x1/andymeneely/police-badge.svg",
+-- "icons/ffffff/transparent/1x1/andymeneely/riposte.svg",
+-- "icons/ffffff/transparent/1x1/aussiesim/card-10-clubs.svg",
+-- …
+-- ]
+
+
+iconsDecoder =
+    D.field "icons" (D.dict (D.dict (D.list D.string)))
+        |> D.map
+            (\dict ->
+                dict
+                    |> Dict.toList
+                    |> List.concatMap
+                        (\( size, vendorDict ) ->
+                            vendorDict
+                                |> Dict.toList
+                                |> List.concatMap
+                                    (\( vendor, icons ) ->
+                                        List.map (\icon -> "icons/ffffff/transparent/" ++ size ++ "/" ++ vendor ++ "/" ++ icon ++ ".svg") icons
+                                    )
+                        )
+            )
 
 
 
@@ -68,46 +189,71 @@ init flags =
 
 
 type Msg
-    = UpdateSides String
-    | UpdateAmount String
-    | UpdateExplode
+    = GotIcons (Result Http.Error (List String))
+    | UpdateDiceSides String
+    | UpdateDiceAmount String
+    | UpdateDiceExplode
     | Roll
     | NewDice (List Int)
     | UpdateTable String
     | Ask
     | NewAnswer String
+    | UpdateIconAmount String
+    | Show
+    | NewIcon (List String)
     | Clear
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        UpdateSides sides ->
-            ( { model | sides = String.toInt sides |> Maybe.withDefault model.sides }, Cmd.none )
+        GotIcons (Ok iconsList) ->
+            let
+                _ =
+                    Debug.log "Icons loaded successfully:" iconsList
+            in
+            ( { model | icons = iconsList }, Cmd.none )
 
-        UpdateAmount amount ->
-            ( { model | amount = String.toInt amount |> Maybe.withDefault model.amount }, Cmd.none )
+        GotIcons (Err err) ->
+            let
+                _ =
+                    Debug.log "Error loading icons:" err
+            in
+            ( model, Cmd.none )
 
-        UpdateExplode ->
-            ( { model | explode = not model.explode }, Cmd.none )
+        UpdateDiceSides sides ->
+            ( { model | dice_sides = String.toInt sides |> Maybe.withDefault model.dice_sides }, Cmd.none )
+
+        UpdateDiceAmount amount ->
+            ( { model | dice_amount = String.toInt amount |> Maybe.withDefault model.dice_amount }, Cmd.none )
+
+        UpdateDiceExplode ->
+            ( { model | dice_explode = not model.dice_explode }, Cmd.none )
 
         Roll ->
-            if model.explode then
-                ( model, Random.generate NewDice (rollExplodingDice model.amount model.sides) )
+            if model.dice_explode then
+                ( model, Random.generate NewDice (rollExplodingDice model.dice_amount model.dice_sides) )
 
             else
-                ( model, Random.generate NewDice (Random.list model.amount (Random.int 1 model.sides)) )
+                ( model, Random.generate NewDice (Random.list model.dice_amount (Random.int 1 model.dice_sides)) )
 
         NewDice dice ->
             ( { model
                 | journal =
-                    [ String.fromInt model.amount
-                        ++ "d"
-                        ++ String.fromInt model.sides
-                        ++ (if model.explode then "!" else "")
-                        ++ ": "
-                        ++ String.join ", " (List.map String.fromInt dice)
-                    ]
+                    Txt
+                        [ "Dice ("
+                            ++ String.fromInt model.dice_amount
+                            ++ "d"
+                            ++ String.fromInt model.dice_sides
+                            ++ (if model.dice_explode then
+                                    "!"
+
+                                else
+                                    ""
+                               )
+                            ++ "): "
+                            ++ String.join ", " (List.map String.fromInt dice)
+                        ]
                         :: model.journal
               }
             , Cmd.none
@@ -121,7 +267,21 @@ update msg model =
 
         NewAnswer answer ->
             ( { model
-                | journal = [ "Table: " ++ model.table, "Response: " ++ answer ] :: model.journal
+                | journal = Txt [ "Table (" ++ model.table ++ "): " ++ answer ] :: model.journal
+              }
+            , Cmd.none
+            )
+
+        UpdateIconAmount amount ->
+            ( { model | icon_amount = String.toInt amount |> Maybe.withDefault model.icon_amount }, Cmd.none )
+
+        Show ->
+            ( model, Random.generate NewIcon (randomIcons model.icons model.icon_amount) )
+
+        NewIcon icons ->
+            ( { model
+                | journal =
+                    Txt [ "Icons: " ] :: List.map (\icon -> Img icon) icons ++ model.journal
               }
             , Cmd.none
             )
@@ -152,6 +312,12 @@ explosiveDieRoll sides =
             )
 
 
+randomIcons : List String -> Int -> Random.Generator (List String)
+randomIcons icons amount =
+    Random.list amount (Random.int 0 (List.length icons - 1))
+        |> Random.map (List.map (\i -> List.Extra.getAt i icons |> Maybe.withDefault ""))
+
+
 
 -- VIEW
 
@@ -166,14 +332,14 @@ view model =
                     [ legend [] [ text "Dices" ]
                     , div [ class "my-input" ]
                         [ label [ for "sides" ] [ text "Sides" ]
-                        , input [ id "sides", type_ "text", placeholder (String.fromInt model.sides), onInput UpdateSides ] []
+                        , input [ id "sides", type_ "text", placeholder (String.fromInt model.dice_sides), onInput UpdateDiceSides ] []
                         ]
                     , div [ class "my-input" ]
                         [ label [ for "amount" ] [ text "Amount" ]
-                        , input [ id "amount", type_ "text", placeholder (String.fromInt model.amount), onInput UpdateAmount ] []
+                        , input [ id "amount", type_ "text", placeholder (String.fromInt model.dice_amount), onInput UpdateDiceAmount ] []
                         ]
                     , div [ class "my-input" ]
-                        [ input [ id "explode", type_ "checkbox", checked model.explode, onClick UpdateExplode ] []
+                        [ input [ id "explode", type_ "checkbox", checked model.dice_explode, onClick UpdateDiceExplode ] []
                         , label [ for "explode" ] [ text "Explode" ]
                         ]
                     , button [ class "my-btn", onClick Roll ] [ text "Roll" ]
@@ -187,53 +353,31 @@ view model =
                         ]
                     , button [ class "my-btn", onClick Ask ] [ text "Ask" ]
                     ]
+                , fieldset [ class "my-inline-container" ]
+                    [ legend [] [ text "Icons" ]
+                    , div [ class "my-input" ]
+                        [ label [ for "amount" ] [ text "Amount" ]
+                        , input [ id "amount", type_ "text", placeholder (String.fromInt model.icon_amount), onInput UpdateIconAmount ] []
+                        ]
+                    , button [ class "my-btn", onClick Show ] [ text "Show" ]
+                    ]
                 , button [ class "my-btn", onClick Clear ] [ text "Clear" ]
                 ]
             ]
         , article []
             [ h1 [ class "title" ] [ text "Journal" ]
-            , div [] (List.map (\x -> div [] (List.map (\y -> p [] [ text y ]) x)) model.journal)
+            , div []
+                (List.map
+                    (\entry ->
+                        case entry of
+                            Txt list ->
+                                p [] (List.map text list)
+
+                            Img src ->
+                                svg [ SvgAttr.width "100", SvgAttr.height "100" ]
+                                    [ image [ SvgAttr.xlinkHref src, SvgAttr.width "100", SvgAttr.height "100" ] [] ]
+                    )
+                    model.journal
+                )
             ]
         ]
-
-
-
--- PORTS
-
-
-port setStorage : E.Value -> Cmd msg
-
-
-port clearStorage : () -> Cmd msg
-
-
-updateWithStorage : Msg -> Model -> ( Model, Cmd Msg )
-updateWithStorage msg oldModel =
-    let
-        ( newModel, cmds ) =
-            update msg oldModel
-    in
-    ( newModel
-    , Cmd.batch [ setStorage (encode newModel), cmds ]
-    )
-
-
-encode : Model -> E.Value
-encode model =
-    E.object
-        [ ( "sides", E.int model.sides )
-        , ( "amount", E.int model.amount )
-        , ( "explode", E.bool model.explode )
-        , ( "table", E.string model.table )
-        , ( "journal", E.list (E.list E.string) model.journal )
-        ]
-
-
-decoder : D.Decoder Model
-decoder =
-    D.map5 Model
-        (D.field "sides" D.int)
-        (D.field "amount" D.int)
-        (D.field "explode" D.bool)
-        (D.field "table" D.string)
-        (D.field "journal" (D.list (D.list D.string)))
