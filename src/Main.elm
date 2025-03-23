@@ -21,7 +21,7 @@ import Tables exposing (..)
 
 version : String
 version =
-    "0.4.1"
+    "0.4.2"
 
 
 
@@ -137,7 +137,7 @@ init flags =
             , journal = []
             }
     , Http.get
-        { url = "icons/icons.json"
+        { url = "./icons/icons.json"
         , expect = Http.expectJson GotIcons iconsDecoder
         }
     )
@@ -178,7 +178,7 @@ iconsDecoder =
                                 |> Dict.toList
                                 |> List.concatMap
                                     (\( vendor, icons ) ->
-                                        List.map (\icon -> "icons/ffffff/transparent/" ++ size ++ "/" ++ vendor ++ "/" ++ icon ++ ".svg") icons
+                                        List.map (\icon -> "./icons/ffffff/transparent/" ++ size ++ "/" ++ vendor ++ "/" ++ icon ++ ".svg") icons
                                     )
                         )
             )
