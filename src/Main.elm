@@ -17,7 +17,7 @@ import Tables exposing (..)
 
 version : String
 version =
-    "0.3.2"
+    "0.3.3"
 
 
 
@@ -37,17 +37,12 @@ main =
 -- MODEL
 
 
-banner : String
-banner =
-    "Welcome to the Dice Roller (v" ++ version ++ ")!\n\n"
-
-
 type alias Model =
     { sides : Int
     , amount : Int
     , explode : Bool
     , table : String
-    , journal : String
+    , journal : List (List String)
     }
 
 
@@ -58,7 +53,12 @@ init flags =
             model
 
         Err _ ->
-            { sides = 6, amount = 1, explode = False, table = Dict.keys tables |> List.head |> Maybe.withDefault "", journal = banner }
+            { sides = 6
+            , amount = 1
+            , explode = False
+            , table = Dict.keys tables |> List.head |> Maybe.withDefault ""
+            , journal = []
+            }
     , Cmd.none
     )
 
@@ -101,23 +101,14 @@ update msg model =
         NewDice dice ->
             ( { model
                 | journal =
-                    String.fromInt model.amount
+                    [ String.fromInt model.amount
                         ++ "d"
                         ++ String.fromInt model.sides
                         ++ (if model.explode then "!" else "")
                         ++ ": "
                         ++ String.join ", " (List.map String.fromInt dice)
-                        ++ "\n"
-                        ++ "Min die: "
-                        ++ String.fromInt (List.minimum dice |> Maybe.withDefault 0)
-                        ++ "\n"
-                        ++ "Max die: "
-                        ++ String.fromInt (List.maximum dice |> Maybe.withDefault 0)
-                        ++ "\n"
-                        ++ "Sum: "
-                        ++ String.fromInt (List.sum dice)
-                        ++ "\n\n"
-                        ++ model.journal
+                    ]
+                        :: model.journal
               }
             , Cmd.none
             )
@@ -130,20 +121,13 @@ update msg model =
 
         NewAnswer answer ->
             ( { model
-                | journal =
-                    "Table: "
-                        ++ model.table
-                        ++ "\n"
-                        ++ "Response: "
-                        ++ answer
-                        ++ "\n\n"
-                        ++ model.journal
+                | journal = [ "Table: " ++ model.table, "Response: " ++ answer ] :: model.journal
               }
             , Cmd.none
             )
 
         Clear ->
-            ( { model | journal = banner }, Cmd.batch [ clearStorage (), Cmd.none ] )
+            ( { model | journal = [] }, Cmd.batch [ clearStorage (), Cmd.none ] )
 
 
 
@@ -174,43 +158,41 @@ explosiveDieRoll sides =
 
 view : Model -> Html Msg
 view model =
-    div []
+    main_ []
         [ header []
-            [ section []
-                [ h1 [ class "title" ] [ text ("Dice Roller (v" ++ version ++ ")") ]
-                , Html.form []
-                    [ fieldset [ class "my-inline-container" ]
-                        [ legend [] [ text "Dices" ]
-                        , div [ class "my-input" ]
-                            [ label [ for "sides" ] [ text "Sides" ]
-                            , input [ id "sides", type_ "text", placeholder (String.fromInt model.sides), onInput UpdateSides ] []
-                            ]
-                        , div [ class "my-input" ]
-                            [ label [ for "amount" ] [ text "Amount" ]
-                            , input [ id "amount", type_ "text", placeholder (String.fromInt model.amount), onInput UpdateAmount ] []
-                            ]
-                        , div [ class "my-input" ]
-                            [ input [ id "explode", type_ "checkbox", checked model.explode, onClick UpdateExplode ] []
-                            , label [ for "explode" ] [ text "Explode" ]
-                            ]
-                        , button [ class "my-btn", onClick Roll ] [ text "Roll" ]
+            [ h1 [ class "title" ] [ text ("Dice Roller (v" ++ version ++ ")") ]
+            , Html.form []
+                [ fieldset [ class "my-inline-container" ]
+                    [ legend [] [ text "Dices" ]
+                    , div [ class "my-input" ]
+                        [ label [ for "sides" ] [ text "Sides" ]
+                        , input [ id "sides", type_ "text", placeholder (String.fromInt model.sides), onInput UpdateSides ] []
                         ]
-                    , fieldset [ class "my-inline-container" ]
-                        [ legend [] [ text "Tables" ]
-                        , div [ class "my-select" ]
-                            [ label [ for "tables" ] [ text "Table" ]
-                            , select [ id "tables", onInput UpdateTable ]
-                                (List.map (\x -> option [ value x, selected (x == model.table) ] [ text x ]) (Dict.keys tables))
-                            ]
-                        , button [ class "my-btn", onClick Ask ] [ text "Ask" ]
+                    , div [ class "my-input" ]
+                        [ label [ for "amount" ] [ text "Amount" ]
+                        , input [ id "amount", type_ "text", placeholder (String.fromInt model.amount), onInput UpdateAmount ] []
                         ]
-                    , button [ class "my-btn", onClick Clear ] [ text "Clear" ]
+                    , div [ class "my-input" ]
+                        [ input [ id "explode", type_ "checkbox", checked model.explode, onClick UpdateExplode ] []
+                        , label [ for "explode" ] [ text "Explode" ]
+                        ]
+                    , button [ class "my-btn", onClick Roll ] [ text "Roll" ]
                     ]
+                , fieldset [ class "my-inline-container" ]
+                    [ legend [] [ text "Tables" ]
+                    , div [ class "my-select" ]
+                        [ label [ for "tables" ] [ text "Table" ]
+                        , select [ id "tables", onInput UpdateTable ]
+                            (List.map (\x -> option [ value x, selected (x == model.table) ] [ text x ]) (Dict.keys tables))
+                        ]
+                    , button [ class "my-btn", onClick Ask ] [ text "Ask" ]
+                    ]
+                , button [ class "my-btn", onClick Clear ] [ text "Clear" ]
                 ]
             ]
-        , main_ []
+        , article []
             [ h1 [ class "title" ] [ text "Journal" ]
-            , pre [] [ text model.journal ]
+            , div [] (List.map (\x -> div [] (List.map (\y -> p [] [ text y ]) x)) model.journal)
             ]
         ]
 
@@ -243,7 +225,7 @@ encode model =
         , ( "amount", E.int model.amount )
         , ( "explode", E.bool model.explode )
         , ( "table", E.string model.table )
-        , ( "journal", E.string model.journal )
+        , ( "journal", E.list (E.list E.string) model.journal )
         ]
 
 
@@ -254,4 +236,4 @@ decoder =
         (D.field "amount" D.int)
         (D.field "explode" D.bool)
         (D.field "table" D.string)
-        (D.field "journal" D.string)
+        (D.field "journal" (D.list (D.list D.string)))

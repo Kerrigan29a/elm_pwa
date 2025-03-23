@@ -7,9 +7,7 @@ import Random
 
 tables =
     Dict.fromList
-        [ ( "CitR: Actions", askCitrActions )
-        , ( "CitR: Focus", askCitrFocus )
-        , ( "Mythic 2e: Actions", askMythicActions )
+        [ ( "Mythic 2e: Actions", askMythicActions )
         , ( "Mythic 2e: Descritions", askMythicDescriptions )
         , ( "Mythic 2e: Elements - Adventure Tone", askMythicElementsAdventureTone )
         , ( "Mythic 2e: Elements - Alien Species Descriptors", askMythicElementsAlienSpeciesDescriptors )
@@ -57,97 +55,6 @@ tables =
         , ( "Mythic 2e: Elements - Undead Descriptors", askMythicElementsUndeadDescriptors )
         , ( "Mythic 2e: Elements - Visions & Dreams", askMythicElementsVisionsAndDreams )
         ]
-
-
-askCitrActions =
-    Random.int 0 (Array.length citrActions - 1) |> Random.map (\i -> Array.get i citrActions |> Maybe.withDefault "")
-
-
-askCitrFocus =
-    Random.int 0 (Array.length citrFocus - 1) |> Random.map (\i -> Array.get i citrFocus |> Maybe.withDefault "")
-
-
-citrActions =
-    Array.fromList
-        [ "Abandon"
-        , "Acquire"
-        , "Arrive"
-        , "Attack"
-        , "Capture"
-        , "Chase"
-        , "Confront"
-        , "Control"
-        , "Create"
-        , "Deliver"
-        , "Demand"
-        , "Disguise"
-        , "Eliminate"
-        , "Escort"
-        , "Evade"
-        , "Explore"
-        , "Focus"
-        , "Guard"
-        , "Hide"
-        , "Impress"
-        , "Improve"
-        , "Investigate"
-        , "Leave"
-        , "Locate"
-        , "Manipulate"
-        , "Prevent"
-        , "Protect"
-        , "Restore"
-        , "Reveal"
-        , "Search"
-        , "Share"
-        , "Steal"
-        , "Support"
-        , "Trap"
-        , "Trick"
-        , "Uncover"
-        ]
-
-
-citrFocus =
-    Array.fromList
-        [ "Bravery"
-        , "Burden"
-        , "Clue"
-        , "Court"
-        , "Death"
-        , "Deception"
-        , "Doubt"
-        , "Fear"
-        , "Fight"
-        , "Followers"
-        , "Gadget"
-        , "Hate"
-        , "History"
-        , "Insight"
-        , "Knowledge"
-        , "Life"
-        , "Love"
-        , "Message"
-        , "Mystery"
-        , "Obligation"
-        , "Opportunity"
-        , "Patron"
-        , "Plan"
-        , "Power"
-        , "Refuge"
-        , "Relationship"
-        , "Reputation"
-        , "Risk"
-        , "Route"
-        , "Secret"
-        , "Skill"
-        , "Treasure"
-        , "Trust"
-        , "Truth"
-        , "Wealth"
-        , "Weapon"
-        ]
-
 
 askMythicActions =
     let
