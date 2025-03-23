@@ -21,7 +21,7 @@ import Tables exposing (..)
 
 version : String
 version =
-    "0.4.0"
+    "0.4.1"
 
 
 
@@ -137,7 +137,7 @@ init flags =
             , journal = []
             }
     , Http.get
-        { url = "/icons/icons.json"
+        { url = "icons/icons.json"
         , expect = Http.expectJson GotIcons iconsDecoder
         }
     )
