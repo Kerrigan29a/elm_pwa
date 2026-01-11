@@ -56,6 +56,7 @@ tables =
         , ( "Mythic 2e: Elements - Visions & Dreams", askMythicElementsVisionsAndDreams )
         ]
 
+
 askMythicActions =
     let
         action1 =
@@ -716,7 +717,7 @@ mythicElementsAlienSpeciesDescriptors =
         ]
 
 
-askMythicElementsAnimalActions = 
+askMythicElementsAnimalActions =
     Random.int 0 (Array.length mythicElementsAnimalActions - 1) |> Random.map (\i -> Array.get i mythicElementsAnimalActions |> Maybe.withDefault "")
 
 
@@ -825,7 +826,7 @@ mythicElementsAnimalActions =
         ]
 
 
-askMythicElementsArmyDescriptors = 
+askMythicElementsArmyDescriptors =
     Random.int 0 (Array.length mythicElementsArmyDescriptors - 1) |> Random.map (\i -> Array.get i mythicElementsArmyDescriptors |> Maybe.withDefault "")
 
 
@@ -5401,5 +5402,3 @@ mythicElementsVisionsAndDreams =
         , "Warning"
         , "Weapon"
         ]
-
-

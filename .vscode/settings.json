@@ -2,4 +2,8 @@
     "files.readonlyInclude": {
         "dist/**/*": true,
     },
+    "chat.tools.terminal.autoApprove": {
+        "elm-format": true
+    },
+    "github.copilot.chat.localeOverride": "en"
 }
