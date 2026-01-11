@@ -3,7 +3,19 @@
         "dist/**/*": true,
     },
     "chat.tools.terminal.autoApprove": {
-        "elm-format": true
+        "elm-format": true,
+        "/^python3 --version$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python3 -c \"import sys; print\\(sys\\.path\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python3 -c \"import http\" 2>&1$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
     },
     "github.copilot.chat.localeOverride": "en"
 }

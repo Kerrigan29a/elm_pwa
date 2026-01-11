@@ -456,7 +456,7 @@ view model =
         [ main_ []
             [ header []
                 [ h1 [ class "title" ] [ text ("Dice Roller (v" ++ version ++ ")") ]
-                , Html.form []
+                , Html.form [ Html.Events.onSubmit NoOp ]
                     [ fieldset [ class "my-inline-container" ]
                         [ legend [] [ text "Dices" ]
                         , div [ class "my-input" ]
@@ -471,7 +471,7 @@ view model =
                             [ input [ id "dice_explode", type_ "checkbox", checked model.dice_explode, onClick UpdateDiceExplode ] []
                             , label [ for "dice_explode" ] [ text "Explode" ]
                             ]
-                        , button [ class "my-btn", onClick Roll ] [ text "Roll" ]
+                        , button [ type_ "button", class "my-btn", onClick Roll ] [ text "Roll" ]
                         ]
                     , fieldset [ class "my-inline-container" ]
                         [ legend [] [ text "Tables" ]
@@ -480,7 +480,7 @@ view model =
                             , select [ id "tables", onInput UpdateTable ]
                                 (List.map (\x -> option [ value x, selected (x == model.table) ] [ text x ]) (Dict.keys tables))
                             ]
-                        , button [ class "my-btn", onClick Ask ] [ text "Ask" ]
+                        , button [ type_ "button", class "my-btn", onClick Ask ] [ text "Ask" ]
                         ]
                     , fieldset [ class "my-inline-container" ]
                         [ legend [] [ text "Icons" ]
@@ -488,10 +488,10 @@ view model =
                             [ label [ for "icon_amount" ] [ text "Amount" ]
                             , input [ id "icon_amount", type_ "text", placeholder (String.fromInt model.icon_amount), onInput UpdateIconAmount ] []
                             ]
-                        , button [ class "my-btn", onClick Show ] [ text "Show" ]
+                        , button [ type_ "button", class "my-btn", onClick Show ] [ text "Show" ]
                         ]
-                    , button [ class "my-btn", onClick Clear ] [ text "Clear" ]
-                    , button [ class "my-btn", onClick ShareUrl ] [ text "Share" ]
+                    , button [ type_ "button", class "my-btn", onClick Clear ] [ text "Clear" ]
+                    , button [ type_ "button", class "my-btn", onClick ShareUrl ] [ text "Share" ]
                     ]
                 ]
             , article []
@@ -510,8 +510,12 @@ view model =
                                                 |> Maybe.andThen (\idx -> List.Extra.getAt idx model.icons)
                                                 |> Maybe.withDefault ""
                                     in
-                                    svg [ SvgAttr.width "100", SvgAttr.height "100" ]
-                                        [ image [ SvgAttr.xlinkHref iconSrc, SvgAttr.width "100", SvgAttr.height "100" ] [] ]
+                                    if String.isEmpty iconSrc then
+                                        p [] [ text ("Icon #" ++ idxStr ++ " (loading...)") ]
+
+                                    else
+                                        svg [ SvgAttr.width "100", SvgAttr.height "100" ]
+                                            [ image [ SvgAttr.xlinkHref iconSrc, SvgAttr.width "100", SvgAttr.height "100" ] [] ]
                         )
                         model.journal
                     )
