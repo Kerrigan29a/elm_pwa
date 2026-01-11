@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="normalize.css">
     <link rel="stylesheet" href="magick.css">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="version-warning.css">
     <script src="main.js"></script>
 </head>
 
@@ -34,19 +35,45 @@
     // Load Elm app
     var STORAGE_NAME = 'dice-roller-v1';
 
-    var storedData = localStorage.getItem(STORAGE_NAME);
-    var flags = storedData ? JSON.parse(storedData) : null;
+    function initializeApp() {
+        if (typeof Elm === 'undefined' || typeof Elm.Main === 'undefined') {
+            console.error('Elm application failed to load. main.js may be missing or invalid.');
+            document.body.innerHTML = '<div style="color: #d9534f; padding: 20px; background: #f2dede; border: 1px solid #ebccd1; border-radius: 4px;"><h2>Error Loading Application</h2><p>The application failed to initialize. Please refresh the page.</p><p style="font-size: 12px; color: #666;">If the problem persists, try clearing your browser cache.</p></div>';
+            return;
+        }
 
-    var app = Elm.Main.init({
-        flags: flags
-    });
+        try {
+            var storedData = localStorage.getItem(STORAGE_NAME);
+            var flags = storedData ? JSON.parse(storedData) : null;
 
-    app.ports.setStorage.subscribe(function (state) {
-        localStorage.setItem(STORAGE_NAME, JSON.stringify(state));
-    });
-    app.ports.clearStorage.subscribe(function () {
-        localStorage.removeItem(STORAGE_NAME);
-    });
+            var app = Elm.Main.init({
+                flags: flags
+            });
+
+            // Only subscribe to ports if they exist
+            if (app.ports && app.ports.setStorage) {
+                app.ports.setStorage.subscribe(function (state) {
+                    localStorage.setItem(STORAGE_NAME, JSON.stringify(state));
+                });
+            }
+            
+            if (app.ports && app.ports.clearStorage) {
+                app.ports.clearStorage.subscribe(function () {
+                    localStorage.removeItem(STORAGE_NAME);
+                });
+            }
+        } catch (err) {
+            console.error('Failed to initialize Elm app:', err);
+            document.body.innerHTML = '<div style="color: #d9534f; padding: 20px; background: #f2dede; border: 1px solid #ebccd1; border-radius: 4px;"><h2>Initialization Error</h2><p>' + err.message + '</p><p style="font-size: 12px; color: #666;"><strong>Details:</strong> ' + err.stack + '</p></div>';
+        }
+    }
+
+    // Wait for DOM to be ready before initializing
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeApp);
+    } else {
+        initializeApp();
+    }
 </script>
 
 </html>

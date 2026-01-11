@@ -1,0 +1,41 @@
+.version-warning {
+    background: #fff3cd;
+    border: 2px solid #ffc107;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.version-warning h2 {
+    margin-top: 0;
+    color: #856404;
+    font-size: 1.5rem;
+}
+
+.version-warning p {
+    margin: 0.5rem 0;
+    color: #856404;
+}
+
+.version-warning strong {
+    color: #d39e00;
+    font-weight: 700;
+}
+
+.version-warning-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.version-warning-actions button {
+    flex: 1;
+}
+
+.version-note {
+    font-size: 0.9rem;
+    font-style: italic;
+    margin-top: 1rem;
+    color: #6c757d;
+}

@@ -20,13 +20,90 @@ import Svg exposing (image, svg)
 import Svg.Attributes as SvgAttr
 import Tables exposing (..)
 import Url
-import Url.Parser as Parser exposing (Parser)
-import Url.Parser.Query as Query
 
 
 version : String
 version =
     "0.5.0"
+
+
+schemaVersion : Int
+schemaVersion =
+    1
+
+
+type alias PersistedState =
+    { version : Int
+    , seed : Int
+    , actions : List Action
+    }
+
+
+type Action
+    = RollAction Int Int Bool
+    | AskAction String
+    | ShowAction Int
+    | ClearAction
+    | ResetSeed Int
+
+
+actionEncoder : Action -> E.Value
+actionEncoder action =
+    case action of
+        RollAction sides amount explode ->
+            E.object
+                [ ( "tag", E.string "roll" )
+                , ( "sides", E.int sides )
+                , ( "amount", E.int amount )
+                , ( "explode", E.bool explode )
+                ]
+
+        AskAction table ->
+            E.object
+                [ ( "tag", E.string "ask" )
+                , ( "table", E.string table )
+                ]
+
+        ShowAction iconAmount ->
+            E.object
+                [ ( "tag", E.string "show" )
+                , ( "iconAmount", E.int iconAmount )
+                ]
+
+        ClearAction ->
+            E.object [ ( "tag", E.string "clear" ) ]
+
+        ResetSeed value ->
+            E.object [ ( "tag", E.string "resetSeed" ), ( "value", E.int value ) ]
+
+
+actionDecoder : D.Decoder Action
+actionDecoder =
+    D.field "tag" D.string
+        |> D.andThen
+            (\tag ->
+                case tag of
+                    "roll" ->
+                        D.map3 RollAction
+                            (D.field "sides" D.int)
+                            (D.field "amount" D.int)
+                            (D.field "explode" D.bool)
+
+                    "ask" ->
+                        D.field "table" D.string |> D.map AskAction
+
+                    "show" ->
+                        D.field "iconAmount" D.int |> D.map ShowAction
+
+                    "clear" ->
+                        D.succeed ClearAction
+
+                    "resetSeed" ->
+                        D.field "value" D.int |> D.map ResetSeed
+
+                    _ ->
+                        D.fail "Unknown action tag"
+            )
 
 
 
@@ -52,6 +129,9 @@ port setStorage : E.Value -> Cmd msg
 
 
 port clearStorage : () -> Cmd msg
+
+
+port reloadApp : () -> Cmd msg
 
 
 updateWithStorage : Msg -> Model -> ( Model, Cmd Msg )
@@ -83,24 +163,18 @@ updateWithStorage msg oldModel =
 encode : Model -> E.Value
 encode model =
     E.object
-        [ ( "dice_sides", E.int model.dice_sides )
-        , ( "dice_amount", E.int model.dice_amount )
-        , ( "dice_explode", E.bool model.dice_explode )
-        , ( "table", E.string model.table )
-        , ( "icon_amount", E.int model.icon_amount )
-        , ( "journal", E.list entryEncoder model.journal )
+        [ ( "version", E.int schemaVersion )
+        , ( "seed", E.int model.seedValue )
+        , ( "actions", E.list actionEncoder model.actions )
         ]
 
 
-decoder : Nav.Key -> D.Decoder Model
-decoder key =
-    D.map6 (\ds da de t ia j -> Model ds da de t ia [] j key)
-        (D.field "dice_sides" D.int)
-        (D.field "dice_amount" D.int)
-        (D.field "dice_explode" D.bool)
-        (D.field "table" D.string)
-        (D.field "icon_amount" D.int)
-        (D.field "journal" (D.list entryDecoder))
+decoder : D.Decoder PersistedState
+decoder =
+    D.map3 PersistedState
+        (D.field "version" D.int |> D.map (\v -> if v <= 0 then 1 else v))
+        (D.field "seed" D.int)
+        (D.field "actions" (D.list actionDecoder))
 
 
 entryEncoder : Entry -> E.Value
@@ -109,15 +183,15 @@ entryEncoder entry =
         Txt list ->
             E.object [ ( "Txt", E.list E.string list ) ]
 
-        Img string ->
-            E.object [ ( "Img", E.string string ) ]
+        Img idx ->
+            E.object [ ( "Img", E.int idx ) ]
 
 
 entryDecoder : D.Decoder Entry
 entryDecoder =
     D.oneOf
         [ D.field "Txt" (D.map Txt (D.list D.string))
-        , D.field "Img" (D.map Img D.string)
+        , D.field "Img" (D.map Img D.int)
         ]
 
 
@@ -126,66 +200,117 @@ entryDecoder =
 
 
 type alias Model =
-    { dice_sides : Int
+    { version : Int
+    , seedValue : Int
+    , seed : Random.Seed
+    , seedReady : Bool
+    , actions : List Action
+    , dice_sides : Int
     , dice_amount : Int
     , dice_explode : Bool
     , table : String
     , icon_amount : Int
     , icons : List String
     , journal : List Entry
+    , pendingHydration : Maybe PersistedState
+    , versionConflict : Maybe PersistedState
     , key : Nav.Key
     }
 
 
 type Entry
     = Txt (List String)
-    | Img String
+    | Img Int
 
 
 init : E.Value -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
     let
-        -- Try URL first, then localStorage
-        modelFromUrl =
-            parseStateFromUrl url key
+        persistedFromUrl =
+            parseStateFromUrl url
 
-        modelFromStorage =
-            case D.decodeValue (decoder key) flags of
-                Ok model ->
-                    Just model
+        persistedFromStorage =
+            case D.decodeValue decoder flags of
+                Ok state ->
+                    Just state
 
                 Err _ ->
                     Nothing
 
-        defaultModel =
-            { dice_sides = 6
+        chosenPersisted =
+            case persistedFromUrl of
+                Just state ->
+                    Just state
+
+                Nothing ->
+                    persistedFromStorage
+
+        versionConflict =
+            chosenPersisted
+                |> Maybe.andThen
+                    (\state ->
+                        if state.version > schemaVersion then
+                            Just state
+
+                        else
+                            Nothing
+                    )
+
+        actualPersisted =
+            if versionConflict /= Nothing then
+                Nothing
+
+            else
+                chosenPersisted
+
+        baseModel =
+            { version = schemaVersion
+            , seedValue = 0
+            , seed = Random.initialSeed 0
+            , seedReady = False
+            , actions = []
+            , dice_sides = 6
             , dice_amount = 1
             , dice_explode = False
             , table = Dict.keys tables |> List.head |> Maybe.withDefault ""
             , icon_amount = 3
             , icons = []
             , journal = []
+            , pendingHydration = actualPersisted
+            , versionConflict = versionConflict
             , key = key
             }
 
-        initialModel =
-            case modelFromUrl of
-                Just urlModel ->
-                    urlModel
+        seededModel =
+            case actualPersisted of
+                Just state ->
+                    { baseModel
+                        | version = state.version
+                        , seedValue = state.seed
+                        , seed = Random.initialSeed state.seed
+                        , seedReady = True
+                        , actions = state.actions
+                    }
 
                 Nothing ->
-                    case modelFromStorage of
-                        Just storageModel ->
-                            storageModel
+                    baseModel
 
-                        Nothing ->
-                            defaultModel
+        seedCmd =
+            case actualPersisted of
+                Just _ ->
+                    Cmd.none
+
+                Nothing ->
+                    Random.generate SeedGenerated (Random.int 1 2147483646)
     in
-    ( initialModel
-    , Http.get
-        { url = "./icons/icons.json"
-        , expect = Http.expectJson GotIcons iconsDecoder
-        }
+    ( seededModel
+    , Cmd.batch
+        [ Http.get
+            { url = "./icons/icons.json"
+            , expect = Http.expectJson GotIcons iconsDecoder
+            }
+        , seedCmd
+        ]
     )
 
 
@@ -234,58 +359,48 @@ iconsDecoder =
 -- URL STATE ENCODING/DECODING
 
 
-parseStateFromUrl : Url.Url -> Nav.Key -> Maybe Model
-parseStateFromUrl url key =
+parseStateFromUrl : Url.Url -> Maybe PersistedState
+parseStateFromUrl url =
     url.query
         |> Maybe.andThen
             (\query ->
                 String.split "=" query
                     |> List.Extra.getAt 1
-                    |> Maybe.andThen (decodeStateFromString key)
+                    |> Maybe.andThen decodeStateFromString
             )
 
 
-decodeStateFromString : Nav.Key -> String -> Maybe Model
-decodeStateFromString key encoded =
-    encoded
-        |> Url.percentDecode
-        |> Maybe.andThen
-            (\decoded ->
-                Base64.decode decoded
-                    |> Result.toMaybe
-            )
-        |> Maybe.andThen (D.decodeString (urlStateDecoder key) >> Result.toMaybe)
+decodeStateFromString : String -> Maybe PersistedState
+decodeStateFromString encoded =
+    case Url.percentDecode encoded of
+        Nothing ->
+            let _ = Debug.log "Failed to percent-decode URL state" encoded in
+            Nothing
+        Just decoded ->
+            case Base64.decode decoded of
+                Err err ->
+                    let _ = Debug.log "Failed to base64-decode state" err in
+                    Nothing
+                Ok json ->
+                    case D.decodeString urlStateDecoder json of
+                        Ok state ->
+                            Just state
+                        Err err ->
+                            let _ = Debug.log "Failed to decode state JSON" (D.errorToString err) in
+                            Nothing
 
 
 encodeStateToString : Model -> String
 encodeStateToString model =
-    encodeUrlState model
+    encode model
         |> E.encode 0
         |> Base64.encode
         |> Url.percentEncode
 
 
-urlStateDecoder : Nav.Key -> D.Decoder Model
-urlStateDecoder key =
-    D.map6 (\ds da de t ia j -> Model ds da de t ia [] j key)
-        (D.field "dice_sides" D.int)
-        (D.field "dice_amount" D.int)
-        (D.field "dice_explode" D.bool)
-        (D.field "table" D.string)
-        (D.field "icon_amount" D.int)
-        (D.field "journal" (D.list urlEntryDecoder))
-
-
-encodeUrlState : Model -> E.Value
-encodeUrlState model =
-    E.object
-        [ ( "dice_sides", E.int model.dice_sides )
-        , ( "dice_amount", E.int model.dice_amount )
-        , ( "dice_explode", E.bool model.dice_explode )
-        , ( "table", E.string model.table )
-        , ( "icon_amount", E.int model.icon_amount )
-        , ( "journal", E.list urlEntryEncoder model.journal )
-        ]
+urlStateDecoder : D.Decoder PersistedState
+urlStateDecoder =
+    decoder
 
 
 urlEntryEncoder : Entry -> E.Value
@@ -294,15 +409,15 @@ urlEntryEncoder entry =
         Txt list ->
             E.object [ ( "Txt", E.list E.string list ) ]
 
-        Img idxStr ->
-            E.object [ ( "Img", E.string idxStr ) ]
+        Img idx ->
+            E.object [ ( "Img", E.int idx ) ]
 
 
 urlEntryDecoder : D.Decoder Entry
 urlEntryDecoder =
     D.oneOf
         [ D.field "Txt" (D.map Txt (D.list D.string))
-        , D.field "Img" (D.map Img D.string)
+        , D.field "Img" (D.map Img D.int)
         ]
 
 
@@ -316,15 +431,16 @@ type Msg
     | UpdateDiceAmount String
     | UpdateDiceExplode
     | Roll
-    | NewDice (List Int)
     | UpdateTable String
     | Ask
-    | NewAnswer String
     | UpdateIconAmount String
     | Show
-    | NewIcon (List Int)
     | Clear
+    | SeedGenerated Int
+    | SeedRefreshed Int
     | ShareUrl
+    | DismissVersionConflict
+    | ReloadWithNewVersion
     | NoOp
 
 
@@ -332,89 +448,95 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         GotIcons (Ok iconsList) ->
-            -- let
-            --     _ =
-            --         Debug.log "Icons loaded successfully:" iconsList
-            -- in
-            ( { model | icons = iconsList }, Cmd.none )
+            let
+                normalizedIcons =
+                    List.sort iconsList
 
-        GotIcons (Err err) ->
-            -- let
-            --     _ =
-            --         Debug.log "Error loading icons:" err
-            -- in
+                hydratedModel =
+                    case model.pendingHydration of
+                        Just state ->
+                            hydrateFromPersisted state model.key normalizedIcons
+
+                        Nothing ->
+                            model
+            in
+            ( { hydratedModel | icons = normalizedIcons, pendingHydration = Nothing }, Cmd.none )
+
+        GotIcons (Err _) ->
             ( model, Cmd.none )
 
+        SeedGenerated seedInt ->
+            ( { model
+                | seedValue = seedInt
+                , seed = Random.initialSeed seedInt
+                , seedReady = True
+              }
+            , Cmd.none
+            )
+
+        SeedRefreshed seedInt ->
+            ( { model
+                | seedValue = seedInt
+                , seed = Random.initialSeed seedInt
+                , seedReady = True
+                , actions = model.actions ++ [ ResetSeed seedInt ]
+              }
+            , Cmd.none
+            )
+
         UpdateDiceSides sides ->
-            ( { model | dice_sides = String.toInt sides |> Maybe.withDefault model.dice_sides }, Cmd.none )
+            case String.toInt sides of
+                Just value ->
+                    ( { model | dice_sides = value }, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
 
         UpdateDiceAmount amount ->
-            ( { model | dice_amount = String.toInt amount |> Maybe.withDefault model.dice_amount }, Cmd.none )
+            case String.toInt amount of
+                Just value ->
+                    ( { model | dice_amount = value }, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
 
         UpdateDiceExplode ->
             ( { model | dice_explode = not model.dice_explode }, Cmd.none )
 
         Roll ->
-            if model.dice_explode then
-                ( model, Random.generate NewDice (rollExplodingDice model.dice_amount model.dice_sides) )
-
-            else
-                ( model, Random.generate NewDice (Random.list model.dice_amount (Random.int 1 model.dice_sides)) )
-
-        NewDice dice ->
-            ( { model
-                | journal =
-                    Txt
-                        [ "Dice ("
-                            ++ String.fromInt model.dice_amount
-                            ++ "d"
-                            ++ String.fromInt model.dice_sides
-                            ++ (if model.dice_explode then
-                                    "!"
-
-                                else
-                                    ""
-                               )
-                            ++ "): "
-                            ++ String.join ", " (List.map String.fromInt dice)
-                        ]
-                        :: model.journal
-              }
-            , Cmd.none
-            )
+            ( recordAction (RollAction model.dice_sides model.dice_amount model.dice_explode) model, Cmd.none )
 
         UpdateTable table ->
             ( { model | table = table }, Cmd.none )
 
         Ask ->
-            ( model, Random.generate NewAnswer (Dict.get model.table tables |> Maybe.withDefault (Random.constant "Table not found")) )
-
-        NewAnswer answer ->
-            ( { model
-                | journal = Txt [ "Table (" ++ model.table ++ "): " ++ answer ] :: model.journal
-              }
-            , Cmd.none
-            )
+            ( recordAction (AskAction model.table) model, Cmd.none )
 
         UpdateIconAmount amount ->
-            ( { model | icon_amount = String.toInt amount |> Maybe.withDefault model.icon_amount }, Cmd.none )
+            case String.toInt amount of
+                Just value ->
+                    ( { model | icon_amount = value }, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
 
         Show ->
-            ( model, Random.generate NewIcon (randomIconIndices model.icons model.icon_amount) )
-
-        NewIcon iconIndices ->
-            ( { model
-                | journal =
-                    Txt [ "Icons: " ] :: List.map (\idx -> Img (String.fromInt idx)) iconIndices ++ model.journal
-              }
-            , Cmd.none
-            )
+            ( recordAction (ShowAction model.icon_amount) model, Cmd.none )
 
         Clear ->
-            ( { model | journal = [] }, Cmd.batch [ clearStorage (), Cmd.none ] )
+            ( recordAction ClearAction model, Random.generate SeedRefreshed (Random.int 1 2147483646) )
 
         ShareUrl ->
             let
+                persistedState =
+                    { version = schemaVersion
+                    , seed = model.seedValue
+                    , actions = model.actions
+                    }
+
+                _ =
+                    Debug.log "Sharing state" persistedState
+
                 stateEncoded =
                     encodeStateToString model
 
@@ -422,6 +544,12 @@ update msg model =
                     "?state=" ++ stateEncoded
             in
             ( model, Nav.pushUrl model.key shareableUrl )
+
+        DismissVersionConflict ->
+            ( { model | versionConflict = Nothing }, Cmd.none )
+
+        ReloadWithNewVersion ->
+            ( model, reloadApp () )
 
         NoOp ->
             ( model, Cmd.none )
@@ -460,6 +588,150 @@ randomIconIndices icons amount =
     Random.list amount (Random.int 0 (List.length icons - 1))
 
 
+applyAction : Action -> Model -> Model
+applyAction action model =
+    case action of
+        RollAction sides amount explode ->
+            if model.seedReady then
+                let
+                    generator =
+                        if explode then
+                            rollExplodingDice amount sides
+
+                        else
+                            Random.list amount (Random.int 1 sides)
+
+                    ( dice, nextSeed ) =
+                        Random.step generator model.seed
+                in
+                { model
+                    | seed = nextSeed
+                    , journal =
+                        Txt
+                            [ "Dice ("
+                                ++ String.fromInt amount
+                                ++ "d"
+                                ++ String.fromInt sides
+                                ++ (if explode then
+                                        "!"
+
+                                    else
+                                        ""
+                                   )
+                                ++ "): "
+                                ++ String.join ", " (List.map String.fromInt dice)
+                            ]
+                            :: model.journal
+                }
+
+            else
+                model
+
+        AskAction table ->
+            if model.seedReady then
+                let
+                    tableGenerator =
+                        Dict.get table tables |> Maybe.withDefault (Random.constant "Table not found")
+
+                    ( answer, nextSeed ) =
+                        Random.step tableGenerator model.seed
+                in
+                { model
+                    | seed = nextSeed
+                    , journal = Txt [ "Table (" ++ table ++ "): " ++ answer ] :: model.journal
+                }
+
+            else
+                model
+
+        ShowAction iconAmount ->
+            if model.seedReady && not (List.isEmpty model.icons) then
+                let
+                    ( iconIndices, nextSeed ) =
+                        Random.step (randomIconIndices model.icons iconAmount) model.seed
+                in
+                { model
+                    | seed = nextSeed
+                    , journal =
+                        Txt [ "Icons: " ] :: List.map Img iconIndices ++ model.journal
+                }
+
+            else
+                model
+
+        ClearAction ->
+            { model | journal = [] }
+
+        ResetSeed value ->
+            { model
+                | seedValue = value
+                , seed = Random.initialSeed value
+                , seedReady = True
+            }
+
+
+recordAction : Action -> Model -> Model
+recordAction action model =
+    let
+        updated =
+            applyAction action model
+    in
+    { updated | actions = model.actions ++ [ action ] }
+
+
+hydrateFromPersisted : PersistedState -> Nav.Key -> List String -> Model
+hydrateFromPersisted state key icons =
+    let
+        baseModel =
+            { version = state.version
+            , seedValue = state.seed
+            , seed = Random.initialSeed state.seed
+            , seedReady = True
+            , actions = []
+            , dice_sides = 6
+            , dice_amount = 1
+            , dice_explode = False
+            , table = Dict.keys tables |> List.head |> Maybe.withDefault ""
+            , icon_amount = 3
+            , icons = icons
+            , journal = []
+            , pendingHydration = Nothing
+            , versionConflict = Nothing
+            , key = key
+            }
+    in
+    List.foldl applyAction baseModel state.actions
+        |> (\m -> { m | actions = state.actions })
+
+
+viewVersionConflict : Model -> Html Msg
+viewVersionConflict model =
+    case model.versionConflict of
+        Nothing ->
+            text ""
+
+        Just state ->
+            div [ class "version-warning" ]
+                [ h2 [] [ text "⚠️ Newer Version Detected" ]
+                , p []
+                    [ text "This shared link was created with app version "
+                    , strong [] [ text (String.fromInt state.version) ]
+                    , text ", but you are running version "
+                    , strong [] [ text (String.fromInt schemaVersion) ]
+                    , text "."
+                    ]
+                , p [] [ text "To view this shared state, you need to update the app." ]
+                , div [ class "version-warning-actions" ]
+                    [ button [ type_ "button", class "my-btn", onClick ReloadWithNewVersion ]
+                        [ text "Update & Load State" ]
+                    , button [ type_ "button", class "my-btn", onClick DismissVersionConflict ]
+                        [ text "Continue Without Loading" ]
+                    ]
+                , p [ class "version-note" ]
+                    [ text "Note: If offline or the app cannot update, you won't be able to load this state." ]
+                ]
+
+
 
 -- VIEW
 
@@ -471,6 +743,7 @@ view model =
         [ main_ []
             [ header []
                 [ h1 [ class "title" ] [ text ("Dice Roller (v" ++ version ++ ")") ]
+                , viewVersionConflict model
                 , Html.form [ Html.Events.onSubmit NoOp ]
                     [ fieldset [ class "my-inline-container" ]
                         [ legend [] [ text "Dices" ]
@@ -522,23 +795,14 @@ view model =
                                     Txt list ->
                                         p [] (List.map text list)
 
-                                    Img idxStr ->
+                                    Img idx ->
                                         let
-                                            maybeIdx =
-                                                String.toInt idxStr
-
                                             iconSrc =
-                                                maybeIdx
-                                                    |> Maybe.andThen (\idx -> List.Extra.getAt idx model.icons)
+                                                List.Extra.getAt idx model.icons
                                                     |> Maybe.withDefault ""
                                         in
                                         if String.isEmpty iconSrc then
-                                            case maybeIdx of
-                                                Just idx ->
-                                                    p [] [ text ("Icon #" ++ String.fromInt idx ++ " (loading...)") ]
-
-                                                Nothing ->
-                                                    p [] [ text "Invalid icon" ]
+                                            p [] [ text ("Icon #" ++ String.fromInt idx ++ " (loading...)") ]
 
                                         else
                                             svg [ SvgAttr.width "100", SvgAttr.height "100" ]
