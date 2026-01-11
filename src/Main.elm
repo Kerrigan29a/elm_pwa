@@ -15,12 +15,23 @@ import Json.Decode as D
 import Json.Encode as E
 import List.Extra
 import Platform.Cmd as Cmd
+import Process
 import Random
 import Svg exposing (image, svg)
 import Svg.Attributes as SvgAttr
 import Tables exposing (..)
+import Task
 import Url
 
+
+viewShareNotice : Model -> Html Msg
+viewShareNotice model =
+    case model.shareNotice of
+        Nothing ->
+            text ""
+
+        Just notice ->
+            div [ class "share-notice" ] [ text notice ]
 
 version : String
 version =
@@ -134,6 +145,9 @@ port clearStorage : () -> Cmd msg
 port reloadApp : () -> Cmd msg
 
 
+port copyToClipboard : String -> Cmd msg
+
+
 updateWithStorage : Msg -> Model -> ( Model, Cmd Msg )
 updateWithStorage msg oldModel =
     let
@@ -215,6 +229,7 @@ type alias Model =
     , pendingHydration : Maybe PersistedState
     , versionConflict : Maybe PersistedState
     , key : Nav.Key
+    , shareNotice : Maybe String
     }
 
 
@@ -279,6 +294,7 @@ init flags url key =
             , pendingHydration = actualPersisted
             , versionConflict = versionConflict
             , key = key
+            , shareNotice = Nothing
             }
 
         seededModel =
@@ -361,30 +377,36 @@ iconsDecoder =
 
 parseStateFromUrl : Url.Url -> Maybe PersistedState
 parseStateFromUrl url =
+    let
+        getStateParam query =
+            query
+                |> String.split "&"
+                |> List.filter (String.startsWith "state=")
+                |> List.head
+                |> Maybe.map (String.dropLeft (String.length "state="))
+    in
     url.query
-        |> Maybe.andThen
-            (\query ->
-                String.split "=" query
-                    |> List.Extra.getAt 1
-                    |> Maybe.andThen decodeStateFromString
-            )
+        |> Maybe.andThen getStateParam
+        |> Maybe.andThen decodeStateFromString
 
 
 decodeStateFromString : String -> Maybe PersistedState
 decodeStateFromString encoded =
-    case Url.percentDecode encoded of
-        Nothing ->
-            Nothing
-        Just decoded ->
-            case Base64.decode decoded of
-                Err err ->
-                    Nothing
-                Ok json ->
-                    case D.decodeString urlStateDecoder json of
-                        Ok state ->
-                            Just state
-                        Err err ->
-                            Nothing
+    Url.percentDecode encoded
+        |> Maybe.andThen
+            (\decoded ->
+                case Base64.decode decoded of
+                    Err _ ->
+                        Nothing
+
+                    Ok json ->
+                        case D.decodeString urlStateDecoder json of
+                            Ok state ->
+                                Just state
+
+                            Err _ ->
+                                Nothing
+            )
 
 
 encodeStateToString : Model -> String
@@ -436,6 +458,7 @@ type Msg
     | SeedGenerated Int
     | SeedRefreshed Int
     | ShareUrl
+    | ClearShareNotice
     | DismissVersionConflict
     | ReloadWithNewVersion
     | NoOp
@@ -525,19 +548,25 @@ update msg model =
 
         ShareUrl ->
             let
-                persistedState =
-                    { version = schemaVersion
-                    , seed = model.seedValue
-                    , actions = model.actions
-                    }
-
                 stateEncoded =
                     encodeStateToString model
 
                 shareableUrl =
                     "?state=" ++ stateEncoded
+
+                clearNoticeCmd =
+                    Task.perform (\_ -> ClearShareNotice) (Process.sleep 2500)
             in
-            ( model, Nav.pushUrl model.key shareableUrl )
+            ( { model | shareNotice = Just "Link copied to clipboard" }
+            , Cmd.batch
+                [ Nav.pushUrl model.key shareableUrl
+                , copyToClipboard shareableUrl
+                , clearNoticeCmd
+                ]
+            )
+
+        ClearShareNotice ->
+            ( { model | shareNotice = Nothing }, Cmd.none )
 
         DismissVersionConflict ->
             ( { model | versionConflict = Nothing }, Cmd.none )
@@ -692,6 +721,7 @@ hydrateFromPersisted state key icons =
             , pendingHydration = Nothing
             , versionConflict = Nothing
             , key = key
+            , shareNotice = Nothing
             }
     in
     List.foldl applyAction baseModel state.actions
@@ -738,6 +768,7 @@ view model =
             [ header []
                 [ h1 [ class "title" ] [ text ("Dice Roller (v" ++ version ++ ")") ]
                 , viewVersionConflict model
+                , viewShareNotice model
                 , Html.form [ Html.Events.onSubmit NoOp ]
                     [ fieldset [ class "my-inline-container" ]
                         [ legend [] [ text "Dices" ]

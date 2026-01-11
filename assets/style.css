@@ -34,3 +34,13 @@ form {
     flex-grow: 1;
     margin-top: 0;
 }
+
+.share-notice {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #e6ffed;
+    color: #0b5d1e;
+    border: 1px solid #c1f0c7;
+    border-radius: 4px;
+    font-size: 14px;
+}

@@ -7,4 +7,3 @@ set -euo pipefail
 npm install -g \
   elm@0.19.1 \
   elm-format
-  elm-test

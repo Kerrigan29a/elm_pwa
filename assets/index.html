@@ -62,6 +62,55 @@
                     localStorage.removeItem(STORAGE_NAME);
                 });
             }
+
+            if (app.ports && app.ports.reloadApp) {
+                app.ports.reloadApp.subscribe(async function () {
+                    try {
+                        // Clear local storage for this app
+                        localStorage.removeItem(STORAGE_NAME);
+
+                        // Unregister service workers to avoid stale cache
+                        if (navigator.serviceWorker) {
+                            const regs = await navigator.serviceWorker.getRegistrations();
+                            await Promise.all(regs.map((r) => r.unregister()));
+                        }
+
+                        // Clear caches created by the service worker
+                        if (window.caches && caches.keys) {
+                            const keys = await caches.keys();
+                            await Promise.all(keys.map((k) => caches.delete(k)));
+                        }
+                    } catch (err) {
+                        console.warn('[Reload] Failed to clear service worker caches', err);
+                    } finally {
+                        // Hard reload
+                        window.location.reload(true);
+                    }
+                });
+            }
+
+            if (app.ports && app.ports.copyToClipboard) {
+                app.ports.copyToClipboard.subscribe(function (relativeUrl) {
+                    try {
+                        var fullUrl = window.location.origin + window.location.pathname + relativeUrl;
+
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(fullUrl).catch(function (err) {
+                                console.warn('[Clipboard] Failed to write using navigator.clipboard', err);
+                            });
+                        } else {
+                            var textarea = document.createElement('textarea');
+                            textarea.value = fullUrl;
+                            document.body.appendChild(textarea);
+                            textarea.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(textarea);
+                        }
+                    } catch (err) {
+                        console.warn('[Clipboard] Copy failed', err);
+                    }
+                });
+            }
         } catch (err) {
             console.error('Failed to initialize Elm app:', err);
             document.body.innerHTML = '<div style="color: #d9534f; padding: 20px; background: #f2dede; border: 1px solid #ebccd1; border-radius: 4px;"><h2>Initialization Error</h2><p>' + err.message + '</p><p style="font-size: 12px; color: #666;"><strong>Details:</strong> ' + err.stack + '</p></div>';

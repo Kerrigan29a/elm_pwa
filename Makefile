@@ -4,9 +4,6 @@ clean:
 	rm -rf dist
 	rm -rf elm-stuff
 
-test:
-	elm-test
-
 run: build
 	cd dist && python3 -m http.server
 
