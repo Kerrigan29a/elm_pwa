@@ -497,27 +497,31 @@ view model =
             , article []
                 [ h1 [ class "title" ] [ text "Journal" ]
                 , div []
-                    (List.map
-                        (\entry ->
-                            case entry of
-                                Txt list ->
-                                    p [] (List.map text list)
+                    (if List.isEmpty model.icons then
+                        [ p [] [ text "Loading icons..." ] ]
 
-                                Img idxStr ->
-                                    let
-                                        iconSrc =
-                                            String.toInt idxStr
-                                                |> Maybe.andThen (\idx -> List.Extra.getAt idx model.icons)
-                                                |> Maybe.withDefault ""
-                                    in
-                                    if String.isEmpty iconSrc then
-                                        p [] [ text ("Icon #" ++ idxStr ++ " (loading...)") ]
+                     else
+                        List.map
+                            (\entry ->
+                                case entry of
+                                    Txt list ->
+                                        p [] (List.map text list)
 
-                                    else
-                                        svg [ SvgAttr.width "100", SvgAttr.height "100" ]
-                                            [ image [ SvgAttr.xlinkHref iconSrc, SvgAttr.width "100", SvgAttr.height "100" ] [] ]
-                        )
-                        model.journal
+                                    Img idxStr ->
+                                        let
+                                            iconSrc =
+                                                String.toInt idxStr
+                                                    |> Maybe.andThen (\idx -> List.Extra.getAt idx model.icons)
+                                                    |> Maybe.withDefault ""
+                                        in
+                                        if String.isEmpty iconSrc then
+                                            p [] [ text ("Icon #" ++ idxStr ++ " (not found)") ]
+
+                                        else
+                                            svg [ SvgAttr.width "100", SvgAttr.height "100" ]
+                                                [ image [ SvgAttr.xlinkHref iconSrc, SvgAttr.width "100", SvgAttr.height "100" ] [] ]
+                            )
+                            model.journal
                     )
                 ]
             ]
