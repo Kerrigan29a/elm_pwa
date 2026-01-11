@@ -59,9 +59,24 @@ updateWithStorage msg oldModel =
     let
         ( newModel, cmds ) =
             update msg oldModel
+
+        shouldSaveToStorage =
+            case msg of
+                GotIcons _ ->
+                    False
+
+                NoOp ->
+                    False
+
+                _ ->
+                    True
     in
     ( newModel
-    , Cmd.batch [ setStorage (encode newModel), cmds ]
+    , if shouldSaveToStorage then
+        Cmd.batch [ setStorage (encode newModel), cmds ]
+
+      else
+        cmds
     )
 
 
@@ -509,17 +524,32 @@ view model =
 
                                     Img idxStr ->
                                         let
-                                            iconSrc =
+                                            maybeIdx =
                                                 String.toInt idxStr
+
+                                            iconSrc =
+                                                maybeIdx
                                                     |> Maybe.andThen (\idx -> List.Extra.getAt idx model.icons)
                                                     |> Maybe.withDefault ""
                                         in
                                         if String.isEmpty iconSrc then
-                                            p [] [ text ("Icon #" ++ idxStr ++ " (not found)") ]
+                                            case maybeIdx of
+                                                Just idx ->
+                                                    p [] [ text ("Icon #" ++ String.fromInt idx ++ " (loading...)") ]
+
+                                                Nothing ->
+                                                    p [] [ text "Invalid icon" ]
 
                                         else
                                             svg [ SvgAttr.width "100", SvgAttr.height "100" ]
-                                                [ image [ SvgAttr.xlinkHref iconSrc, SvgAttr.width "100", SvgAttr.height "100" ] [] ]
+                                                [ image 
+                                                    [ SvgAttr.xlinkHref iconSrc
+                                                    , SvgAttr.width "100"
+                                                    , SvgAttr.height "100"
+                                                    , attribute "loading" "lazy"
+                                                    ] 
+                                                    [] 
+                                                ]
                             )
                             model.journal
                     )
