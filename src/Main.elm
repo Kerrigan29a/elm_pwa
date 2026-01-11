@@ -374,19 +374,16 @@ decodeStateFromString : String -> Maybe PersistedState
 decodeStateFromString encoded =
     case Url.percentDecode encoded of
         Nothing ->
-            let _ = Debug.log "Failed to percent-decode URL state" encoded in
             Nothing
         Just decoded ->
             case Base64.decode decoded of
                 Err err ->
-                    let _ = Debug.log "Failed to base64-decode state" err in
                     Nothing
                 Ok json ->
                     case D.decodeString urlStateDecoder json of
                         Ok state ->
                             Just state
                         Err err ->
-                            let _ = Debug.log "Failed to decode state JSON" (D.errorToString err) in
                             Nothing
 
 
@@ -533,9 +530,6 @@ update msg model =
                     , seed = model.seedValue
                     , actions = model.actions
                     }
-
-                _ =
-                    Debug.log "Sharing state" persistedState
 
                 stateEncoded =
                     encodeStateToString model

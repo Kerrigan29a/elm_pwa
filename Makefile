@@ -10,11 +10,9 @@ run: build
 build: dist/main.js dist/service-worker.js ${subst assets,dist,$(filter-out assets/service-worker.js.in,$(wildcard assets/* assets/icons/*))} 
 	echo $^
 
-dist/main.js: src/Main.elm
-	elm make $< --output=$@
 
-# dist/main.js: src/Main.elm
-# 	elm make $< --output=$@ --optimize
+dist/main.js: src/Main.elm
+	elm make $< --output=$@ --optimize
 
 dist/service-worker.js: assets/service-worker.js.in dist/main.js
 	python3 generate_service_worker.py
