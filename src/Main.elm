@@ -25,7 +25,7 @@ import Url
 
 version : String
 version =
-    "0.7.0"
+    "0.8.0"
 
 
 schemaVersion : Int
@@ -198,8 +198,8 @@ viewHeader model =
 viewThemeToggle : Model -> Html Msg
 viewThemeToggle model =
     div [ class "theme-toggle" ]
-        [ label [] [ text "Theme" ]
-        , select [ onInput (themeFromString >> SetTheme) ]
+        [ label [ class "control-label" ] [ text "Theme:" ]
+        , select [ class "theme-select", onInput (themeFromString >> SetTheme) ]
             [ option [ value "auto", selected (model.theme == Auto) ] [ text "Auto" ]
             , option [ value "light", selected (model.theme == Light) ] [ text "Light" ]
             , option [ value "dark", selected (model.theme == Dark) ] [ text "Dark" ]
@@ -250,7 +250,7 @@ viewActions model =
 viewDiceCard : Model -> Html Msg
 viewDiceCard model =
     div [ class "action-card" ]
-        [ h2 [ class "card-title" ] [ text "🎲 Dice" ]
+        [ h2 [ class "card-title" ] [ text "🎲 Numbers" ]
         , div [ class "custom-roll" ]
             [ label [ class "input-label" ] [ text "Amount:" ]
             , input
@@ -276,16 +276,37 @@ viewDiceCard model =
                 ]
             , button [ type_ "button", class "primary-btn", onClick Roll ] [ text "Roll" ]
             ]
+        , case model.dice_result of
+            Just entries ->
+                div [ class "action-result" ]
+                    [ h3 [ class "action-result-title" ] [ text "Result" ]
+                    , div [ class "action-result-body" ] (List.map (viewEntry model) entries)
+                    ]
+
+            Nothing ->
+                text ""
         ]
 
 
 viewTablesCard : Model -> Html Msg
 viewTablesCard model =
     div [ class "action-card" ]
-        [ h2 [ class "card-title" ] [ text "📜 Random Word" ]
-        , select [ class "table-select", onInput UpdateTable ]
-            (List.map (\x -> option [ value x, selected (x == model.table) ] [ text x ]) (Dict.keys tables))
+        [ h2 [ class "card-title" ] [ text "📜 Words" ]
+        , div [ class "table-input" ]
+            [ label [ class "input-label" ] [ text "Table:" ]
+            , select [ class "table-select", onInput UpdateTable ]
+                (List.map (\x -> option [ value x, selected (x == model.table) ] [ text x ]) (Dict.keys tables))
+            ]
         , button [ type_ "button", class "primary-btn", onClick Ask ] [ text "Ask" ]
+        , case model.table_result of
+            Just entries ->
+                div [ class "action-result" ]
+                    [ h3 [ class "action-result-title" ] [ text "Result" ]
+                    , div [ class "action-result-body" ] (List.map (viewEntry model) entries)
+                    ]
+
+            Nothing ->
+                text ""
         ]
 
 
@@ -294,7 +315,7 @@ viewIconsCard model =
     div [ class "action-card" ]
         [ h2 [ class "card-title" ] [ text "🎨 Pictograms" ]
         , div [ class "icon-input" ]
-            [ label [] [ text "Number of icons:" ]
+        [ label [ class "input-label" ] [ text "Amount:" ]
             , input
                 [ type_ "number"
                 , class "roll-input"
@@ -304,6 +325,15 @@ viewIconsCard model =
                 []
             ]
         , button [ type_ "button", class "primary-btn", onClick Show ] [ text "Show" ]
+        , case model.icons_result of
+            Just entries ->
+                div [ class "action-result" ]
+                    [ h3 [ class "action-result-title" ] [ text "Result" ]
+                    , div [ class "action-result-body" ] (List.map (viewEntry model) entries)
+                    ]
+
+            Nothing ->
+                text ""
         ]
 
 
@@ -313,7 +343,7 @@ viewHistory model =
         [ div [ class "history-header" ]
             [ h2 [] [ text "History" ]
             , div [ class "history-actions" ]
-                [ button [ type_ "button", class "ghost-btn", onClick ShareUrl ] [ text "Share" ]
+                [ button [ type_ "button", class "ghost-btn", onClick ShareUrl ] [ text "Copy URL" ]
                 , button [ type_ "button", class "ghost-btn", onClick Clear ] [ text "Clear" ]
                 ]
             ]
@@ -322,7 +352,11 @@ viewHistory model =
 
           else
             div [ class "history-entries" ]
-                (List.map (viewHistoryEntry model) model.journal)
+                (List.map (viewHistoryEntry model) (List.filter (\item -> 
+                    case item.action of
+                        ResetSeed _ -> False
+                        _ -> True
+                ) model.journal))
         ]
 
 
@@ -335,10 +369,21 @@ viewHistoryEntry model item =
         body =
             List.map (viewEntry model) item.entries
 
+        hasIcons =
+            List.any (
+                \entry ->
+                    case entry of
+                        Img _ ->
+                            True
+
+                        _ ->
+                            False
+            ) item.entries
+
         ( actionLabel, actionDetails ) =
             case item.action of
                 RollAction sides amount explode ->
-                    ( "Dice"
+                    ( "Numbers"
                     , String.fromInt amount
                         ++ "d"
                         ++ String.fromInt sides
@@ -351,10 +396,10 @@ viewHistoryEntry model item =
                     )
 
                 AskAction table ->
-                    ( "Table", "(" ++ table ++ ")" )
+                    ( "Words", "(" ++ table ++ ")" )
 
                 ShowAction iconCount ->
-                    ( "Icons", "(" ++ String.fromInt iconCount ++ " icons)" )
+                    ( "Pictograms", "(" ++ String.fromInt iconCount ++ " icons)" )
 
                 ClearAction ->
                     ( "Clear", "" )
@@ -364,6 +409,10 @@ viewHistoryEntry model item =
     in
     button
         [ class "history-entry clickable"
+        , classList
+            [ ( "has-icons", hasIcons )
+            , ( "text-only", not hasIcons )
+            ]
         , type_ "button"
         , onClick (ReplayAction item.action)
         ]
@@ -612,6 +661,9 @@ type alias Model =
     , icon_amount : Int
     , icons : List String
     , journal : List HistoryItem
+    , dice_result : Maybe (List Entry)
+    , table_result : Maybe (List Entry)
+    , icons_result : Maybe (List Entry)
     , pendingHydration : Maybe PersistedState
     , versionConflict : Maybe PersistedState
     , key : Nav.Key
@@ -687,6 +739,9 @@ init flags url key =
             , icon_amount = 3
             , icons = []
             , journal = []
+            , dice_result = Nothing
+            , table_result = Nothing
+            , icons_result = Nothing
             , pendingHydration = actualPersisted
             , versionConflict = versionConflict
             , key = key
@@ -972,7 +1027,7 @@ update msg model =
                 clearNoticeCmd =
                     Task.perform (\_ -> ClearShareNotice) (Process.sleep 2500)
             in
-            ( { model | shareNotice = Just "Link copied to clipboard" }
+            ( { model | shareNotice = Just "URL copied" }
             , Cmd.batch
                 [ Nav.pushUrl model.key shareableUrl
                 , copyToClipboard shareableUrl
@@ -1059,7 +1114,7 @@ applyAction action model =
                             [ String.join ", " (List.map String.fromInt dice)
                             ]
                 in
-                ( { model | seed = nextSeed }, [ entry ] )
+                ( { model | seed = nextSeed, dice_result = Just [ entry ], table_result = Nothing, icons_result = Nothing }, [ entry ] )
 
             else
                 ( model, [] )
@@ -1076,7 +1131,7 @@ applyAction action model =
                     entry =
                         Txt [ answer ]
                 in
-                ( { model | seed = nextSeed }, [ entry ] )
+                ( { model | seed = nextSeed, table_result = Just [ entry ], dice_result = Nothing, icons_result = Nothing }, [ entry ] )
 
             else
                 ( model, [] )
@@ -1090,7 +1145,7 @@ applyAction action model =
                     entries =
                         List.map Img iconIndices
                 in
-                ( { model | seed = nextSeed }, entries )
+                ( { model | seed = nextSeed, icons_result = Just entries, dice_result = Nothing, table_result = Nothing }, entries )
 
             else
                 ( model, [] )
@@ -1150,6 +1205,9 @@ hydrateFromPersisted state key icons zone =
             , icon_amount = 3
             , icons = icons
             , journal = []
+            , dice_result = Nothing
+            , table_result = Nothing
+            , icons_result = Nothing
             , pendingHydration = Nothing
             , versionConflict = Nothing
             , key = key
