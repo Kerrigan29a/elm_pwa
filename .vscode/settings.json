@@ -8,14 +8,8 @@
             "approve": true,
             "matchCommandLine": true
         },
-        "/^python3 -c \"import sys; print\\(sys\\.path\\)\"$/": {
-            "approve": true,
-            "matchCommandLine": true
-        },
-        "/^python3 -c \"import http\" 2>&1$/": {
-            "approve": true,
-            "matchCommandLine": true
-        }
+        "make": true,
+        "elm": true
     },
     "github.copilot.chat.localeOverride": "en"
 }

@@ -4,17 +4,15 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <title>Dice Roller</title>
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="normalize.css">
-    <link rel="stylesheet" href="magick.css">
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="version-warning.css">
+    <link rel="preload" href="style.css?v=0.7.0" as="style">
+    <link rel="stylesheet" href="style.css?v=0.7.0">
     <script src="main.js"></script>
 </head>
 
@@ -36,11 +34,61 @@
     var STORAGE_NAME = 'dice-roller-v1';
 
     function initializeApp() {
-        if (typeof Elm === 'undefined' || typeof Elm.Main === 'undefined') {
-            console.error('Elm application failed to load. main.js may be missing or invalid.');
-            document.body.innerHTML = '<div style="color: #d9534f; padding: 20px; background: #f2dede; border: 1px solid #ebccd1; border-radius: 4px;"><h2>Error Loading Application</h2><p>The application failed to initialize. Please refresh the page.</p><p style="font-size: 12px; color: #666;">If the problem persists, try clearing your browser cache.</p></div>';
+        function loadScript(src) {
+            return new Promise(function (resolve, reject) {
+                var s = document.createElement('script');
+                s.src = src;
+                s.onload = resolve;
+                s.onerror = reject;
+                document.head.appendChild(s);
+            });
+        }
+
+        async function ensureElmLoaded() {
+            if (typeof Elm !== 'undefined' && typeof Elm.Main !== 'undefined') {
+                return true;
+            }
+
+            const candidates = [
+                'main.js',
+                './main.js',
+                '/main.js',
+                'dist/main.js',
+                './dist/main.js'
+            ];
+
+            for (const c of candidates) {
+                try {
+                    await loadScript(c);
+                    if (typeof Elm !== 'undefined' && typeof Elm.Main !== 'undefined') {
+                        return true;
+                    }
+                } catch (_) {
+                    // try next candidate
+                }
+            }
+
+            return false;
+        }
+
+        // Attempt to ensure Elm is available before proceeding
+        if (!(typeof Elm !== 'undefined' && typeof Elm.Main !== 'undefined')) {
+            ensureElmLoaded().then(function (ok) {
+                if (!ok) {
+                    console.error('Elm application failed to load. main.js may be missing or invalid.');
+                    document.body.innerHTML = '<div style="color: #d9534f; padding: 20px; background: #f2dede; border: 1px solid #ebccd1; border-radius: 4px;"><h2>Error Loading Application</h2><p>The application failed to initialize. Please refresh the page.</p><p style="font-size: 12px; color: #666;">If the problem persists, try clearing your browser cache.</p></div>';
+                    return;
+                }
+                // Continue with normal init after loading
+                initializeAfterElm();
+            });
             return;
         }
+
+        initializeAfterElm();
+    }
+
+    function initializeAfterElm() {
 
         try {
             var storedData = localStorage.getItem(STORAGE_NAME);
