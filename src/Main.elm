@@ -1,7 +1,5 @@
 port module Main exposing (..)
 
---   https://guide.elm-lang.org/effects/random.html
-
 import Array exposing (..)
 import Base64
 import Browser
@@ -25,24 +23,14 @@ import Time exposing (Posix, Zone)
 import Url
 
 
-viewShareNotice : Model -> Html Msg
-viewShareNotice model =
-    case model.shareNotice of
-        Nothing ->
-            text ""
-
-        Just notice ->
-            div [ class "notice success", attribute "role" "status", attribute "aria-live" "polite" ] [ text notice ]
-
-
 version : String
 version =
-    "0.6.0"
+    "0.7.0"
 
 
 schemaVersion : Int
 schemaVersion =
-    2
+    1
 
 
 type ThemeMode
@@ -158,6 +146,7 @@ actionDecoder =
         )
 
 
+
 -- VIEW
 
 
@@ -181,6 +170,16 @@ view model =
             ]
         ]
     }
+
+
+viewShareNotice : Model -> Html Msg
+viewShareNotice model =
+    case model.shareNotice of
+        Nothing ->
+            text ""
+
+        Just notice ->
+            div [ class "notice success", attribute "role" "status", attribute "aria-live" "polite" ] [ text notice ]
 
 
 viewHeader : Model -> Html Msg
@@ -467,6 +466,7 @@ formatTimestamp zone posix =
     year ++ "-" ++ month ++ "-" ++ day ++ " " ++ hour ++ ":" ++ minute ++ ":" ++ second
 
 
+
 -- MAIN
 
 
@@ -536,7 +536,16 @@ encode model =
 decoder : D.Decoder PersistedState
 decoder =
     D.map4 PersistedState
-        (D.field "version" D.int |> D.map (\v -> if v <= 0 then 1 else v))
+        (D.field "version" D.int
+            |> D.map
+                (\v ->
+                    if v <= 0 then
+                        1
+
+                    else
+                        v
+                )
+        )
         (D.field "seed" D.int)
         (D.field "actions" (D.list actionDecoder))
         (D.oneOf [ D.field "theme" (D.string |> D.map themeFromString), D.succeed Auto ])
@@ -623,9 +632,6 @@ type alias HistoryItem =
     , timestamp : Posix
     , entries : List Entry
     }
-
-
-
 
 
 init : E.Value -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -1200,7 +1206,3 @@ viewVersionConflict model =
                 , p [ class "version-note" ]
                     [ text "Note: If offline or the app cannot update, you won't be able to load this state." ]
                 ]
-
-
-
-
